@@ -524,8 +524,14 @@ def fmt_valor(v):
 
 
 def gerar_funil_png(count, volume, canal, tipo, data_label):
-    fases = FASES_PC if canal == "PC" else FASES_NOMES
-    valores = [volume.get(f, 0) for f in fases] if tipo == "volume" else [count.get(f, 0) for f in fases]
+    # Usa todas as fases, mas filtra as que têm valor zero
+    fases_base = FASES_NOMES
+    if tipo == "volume":
+        fases = [f for f in fases_base if volume.get(f, 0) > 0]
+        valores = [volume.get(f, 0) for f in fases]
+    else:
+        fases = [f for f in fases_base if count.get(f, 0) > 0]
+        valores = [count.get(f, 0) for f in fases]
     total = sum(valores)
     n = len(fases)
     fig, ax = plt.subplots(figsize=(3.2, 4.2))
@@ -557,8 +563,8 @@ def gerar_funil_png(count, volume, canal, tipo, data_label):
     buf = io.BytesIO(); plt.savefig(buf, format='png', dpi=180, bbox_inches='tight', facecolor='white'); plt.close(); buf.seek(0); return buf.read()
 
 
-def gerar_legenda_png(canal="full"):
-    fases = FASES_PC if canal == "PC" else FASES_NOMES
+def gerar_legenda_png(fases_list=None):
+    fases = fases_list if fases_list else FASES_NOMES
     fig, ax = plt.subplots(figsize=(2.4, 2.6)); fig.patch.set_facecolor('white')
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
     ax.text(0.95, 0.97, "Fase", ha='right', va='top', fontsize=9, color='#444444', fontweight='bold')
@@ -862,12 +868,18 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     cache = {}
     combos = list(dict.fromkeys((c, t) for _, c, t, _ in SLIDES_FUNIL))
     periodos = [("atual", data_atual), ("sem_pass", data_sem_pass), ("mes_ant", data_mes_ant)]
+    # Coletar fases ativas por canal (para legendas dinâmicas)
+    fases_ativas = {}
     for canal, tipo in combos:
         for chave, data_ref in periodos:
             count, volume = retrato_funil(rows, canal, data_ref)
             mes = MESES_PT[data_ref.month]
             data_label = f"{mes} ({data_ref.strftime('%d/%m')})"
             cache[(canal, tipo, chave)] = gerar_funil_png(count, volume, canal, tipo, data_label)
+            # Coleta fases com valor > 0 para a legenda
+            for f in FASES_NOMES:
+                if count.get(f, 0) > 0 or volume.get(f, 0) > 0:
+                    fases_ativas.setdefault(canal, set()).add(f)
         c_atual, v_atual = retrato_funil(rows, canal, data_atual)
         if tipo == "volume":
             lbl = f"R${sum(v_atual.values())/1e6:.1f}M"
@@ -876,7 +888,11 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
         log(f"  ✅ {canal:12s} | {tipo:10s} | atual: {lbl}")
         advance(2)
 
-    leg_full = gerar_legenda_png("full"); leg_pc = gerar_legenda_png("PC")
+    # Gerar legendas dinâmicas por canal (mantém a ordem original, só exclui zerados)
+    legendas = {}
+    for canal in set(c for c, _ in combos):
+        fases_canal = [f for f in FASES_NOMES if f in fases_ativas.get(canal, set())]
+        legendas[canal] = gerar_legenda_png(fases_canal if fases_canal else FASES_NOMES)
     log("  ✅ Legendas")
     advance(1)
 
@@ -896,7 +912,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
         slide = prs.slides[idx]; nome = nomes.get(canal, canal)
         periodo_esq = "mes_ant" if comp == "mensal" else "sem_pass"
         img_esq = cache[(canal, tipo, periodo_esq)]; img_dir = cache[(canal, tipo, "atual")]
-        leg = leg_pc if canal == "PC" else leg_full
+        leg = legendas.get(canal, legendas.get("B2C", gerar_legenda_png()))
         remover_funis_existentes(slide)
         add_img(slide, img_esq, POS_ESQ); add_img(slide, img_dir, POS_DIR); add_img(slide, leg, POS_LEGENDA)
         if comp == "mensal":
