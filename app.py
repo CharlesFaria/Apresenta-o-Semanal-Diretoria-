@@ -966,9 +966,10 @@ def render_file_card(title, subtitle, icon, accent, file_obj, required=False):
 
     icon_class = f"{accent}" if has_file else "empty"
     file_info = ""
-    if has_file:
-        size = f"({has_file.size / 1024:.0f} KB)" if hasattr(has_file, 'size') else ""
-        file_info = f'<span class="upload-filename">{has_file.name}</span> <span style="color:#94a3b8;font-size:11px">{size}</span>'
+    if has_file and file_obj is not None:
+        size = f"({file_obj.size / 1024:.0f} KB)" if hasattr(file_obj, 'size') else ""
+        name = file_obj.name if hasattr(file_obj, 'name') else "arquivo"
+        file_info = f'<span class="upload-filename">{name}</span> <span style="color:#94a3b8;font-size:11px">{size}</span>'
     else:
         file_info = subtitle
 
@@ -1013,41 +1014,19 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        render_file_card("Base do Funil", "Atualizar Entrada nas Fases.xlsx", "📈", "blue",
-                         st.session_state.get('_f_funil'), required=True)
-        f_funil = st.file_uploader("base_funil", type=["xlsx"], key="f_funil", label_visibility="collapsed")
-        if f_funil:
-            st.session_state['_f_funil'] = f_funil
-
+        f_funil = st.file_uploader("📈 Base do Funil (Entrada nas Fases)", type=["xlsx"], key="f_funil")
     with col2:
-        render_file_card("Apresentação Modelo", "Arquivo .pptx da diretoria", "📑", "green",
-                         st.session_state.get('_f_pptx'), required=True)
-        f_pptx = st.file_uploader("apresentacao", type=["pptx"], key="f_pptx", label_visibility="collapsed")
-        if f_pptx:
-            st.session_state['_f_pptx'] = f_pptx
+        f_pptx = st.file_uploader("📑 Apresentação Modelo (.pptx)", type=["pptx"], key="f_pptx")
 
     col3, col4 = st.columns(2)
     with col3:
-        render_file_card("Base Dashboard (Opps)", "Entrada nas Fases Dash.xlsx", "📊", "purple",
-                         st.session_state.get('_f_dash'))
-        f_dash = st.file_uploader("base_dash", type=["xlsx"], key="f_dash", label_visibility="collapsed")
-        if f_dash:
-            st.session_state['_f_dash'] = f_dash
-
+        f_dash = st.file_uploader("📊 Base Dashboard — Opps (opcional)", type=["xlsx"], key="f_dash")
     with col4:
-        render_file_card("Base Dashboard (Leads)", "Entradas nas Fases Leads Dash.xlsx", "👥", "amber",
-                         st.session_state.get('_f_leads'))
-        f_leads = st.file_uploader("base_leads", type=["xlsx"], key="f_leads", label_visibility="collapsed")
-        if f_leads:
-            st.session_state['_f_leads'] = f_leads
+        f_leads = st.file_uploader("👥 Base Dashboard — Leads (opcional)", type=["xlsx"], key="f_leads")
 
     # Planejamento (colapsável)
     with st.expander("🎯 Planejamento — muda pouco, carregue apenas se necessário"):
-        render_file_card("Planejamento Mensal", "Planejamento.xlsx — metas por canal", "🎯", "amber",
-                         st.session_state.get('_f_plan'))
-        f_plan = st.file_uploader("planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
-        if f_plan:
-            st.session_state['_f_plan'] = f_plan
+        f_plan = st.file_uploader("Planejamento Mensal", type=["xlsx"], key="f_plan")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
