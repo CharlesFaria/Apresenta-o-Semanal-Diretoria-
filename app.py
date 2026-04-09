@@ -147,14 +147,10 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
-    /* Hide default file uploader label */
-    .stFileUploader label { display: none !important; }
-    .stFileUploader > div { padding: 0 !important; }
+    /* File uploader styling */
     .stFileUploader > div > div { padding: 6px !important; }
     div[data-testid="stFileUploaderDropzone"] {
-        background: transparent !important;
-        border: none !important;
-        padding: 4px !important;
+        padding: 8px !important;
     }
     div[data-testid="stFileUploaderDropzone"] > div > span {
         font-size: 12px !important;
@@ -164,9 +160,6 @@ st.markdown("""
         font-size: 12px !important;
         padding: 4px 12px !important;
         border-radius: 8px !important;
-    }
-    section[data-testid="stFileUploaderDropzone"] small {
-        font-size: 10px !important;
     }
 
     /* Date cards */
@@ -1014,19 +1007,28 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        f_funil = st.file_uploader("📈 Base do Funil (Entrada nas Fases)", type=["xlsx"], key="f_funil")
+        st.markdown("**📈 Base do Funil** `OBRIGATÓRIO`", help="Atualizar Entrada nas Fases.xlsx")
+        st.caption("Exportação do Salesforce — Atualizar Entrada nas Fases.xlsx")
+        f_funil = st.file_uploader("Base do Funil", type=["xlsx"], key="f_funil", label_visibility="collapsed")
     with col2:
-        f_pptx = st.file_uploader("📑 Apresentação Modelo (.pptx)", type=["pptx"], key="f_pptx")
+        st.markdown("**📑 Apresentação Modelo** `OBRIGATÓRIO`", help="Arquivo .pptx da diretoria")
+        st.caption("Arquivo .pptx atual da diretoria")
+        f_pptx = st.file_uploader("Apresentação", type=["pptx"], key="f_pptx", label_visibility="collapsed")
 
     col3, col4 = st.columns(2)
     with col3:
-        f_dash = st.file_uploader("📊 Base Dashboard — Opps (opcional)", type=["xlsx"], key="f_dash")
+        st.markdown("**📊 Base Dashboard (Opps)**")
+        st.caption("Entrada nas Fases Dash.xlsx — período mais amplo")
+        f_dash = st.file_uploader("Base Dash", type=["xlsx"], key="f_dash", label_visibility="collapsed")
     with col4:
-        f_leads = st.file_uploader("👥 Base Dashboard — Leads (opcional)", type=["xlsx"], key="f_leads")
+        st.markdown("**👥 Base Dashboard (Leads)**")
+        st.caption("Entradas nas Fases Leads Dash.xlsx")
+        f_leads = st.file_uploader("Base Leads", type=["xlsx"], key="f_leads", label_visibility="collapsed")
 
     # Planejamento (colapsável)
     with st.expander("🎯 Planejamento — muda pouco, carregue apenas se necessário"):
-        f_plan = st.file_uploader("Planejamento Mensal", type=["xlsx"], key="f_plan")
+        st.caption("Planejamento.xlsx — metas mensais por canal")
+        f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
