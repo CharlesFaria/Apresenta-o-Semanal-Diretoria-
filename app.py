@@ -36,20 +36,22 @@ st.markdown("""
 
     /* ═══ BARI BRAND TOKENS ═══ */
     :root {
-        --bari-green: #00A868;
-        --bari-green-dark: #008C56;
-        --bari-green-light: #E6F7F0;
-        --bari-dark: #1A1A2E;
-        --bari-dark-2: #0D0D1A;
-        --bari-gray-50: #F7F8FA;
-        --bari-gray-100: #EEF0F4;
-        --bari-gray-200: #D8DCE4;
-        --bari-gray-400: #9CA3B4;
-        --bari-gray-600: #5A6275;
+        --bari-blue: #4A90E2;
+        --bari-blue-dark: #2563EB;
+        --bari-blue-light: #EBF2FC;
+        --bari-navy: #0A1628;
+        --bari-navy-2: #0D1B2A;
+        --bari-navy-3: #142236;
+        --bari-gray-50: #F5F7FA;
+        --bari-gray-100: #E8ECF2;
+        --bari-gray-200: #D0D6E0;
+        --bari-gray-400: #8E99A8;
+        --bari-gray-600: #556070;
         --bari-gray-800: #2D3142;
         --bari-white: #FFFFFF;
-        --bari-orange: #FF8C42;
+        --bari-orange: #F59E0B;
         --bari-red: #E53E3E;
+        --bari-green-ok: #10B981;
     }
 
     /* ═══ GLOBAL ═══ */
@@ -65,7 +67,7 @@ st.markdown("""
 
     /* ═══ HEADER ═══ */
     .bari-header {
-        background: var(--bari-dark-2);
+        background: var(--bari-navy-2);
         padding: 0;
         margin: -1rem -1rem 32px -1rem;
         color: white;
@@ -85,7 +87,7 @@ st.markdown("""
         position: absolute;
         bottom: 0; left: 0; right: 0;
         height: 3px;
-        background: linear-gradient(90deg, var(--bari-green) 0%, var(--bari-green-dark) 50%, transparent 100%);
+        background: linear-gradient(90deg, var(--bari-blue) 0%, var(--bari-blue-dark) 50%, transparent 100%);
     }
     /* Decorative dots pattern */
     .bari-header::before {
@@ -93,7 +95,7 @@ st.markdown("""
         position: absolute;
         top: 0; right: 0;
         width: 300px; height: 100%;
-        background: radial-gradient(circle at 2px 2px, rgba(0,168,104,0.08) 1px, transparent 0);
+        background: radial-gradient(circle at 2px 2px, rgba(74,144,226,0.08) 1px, transparent 0);
         background-size: 20px 20px;
     }
     .bari-logo {
@@ -104,7 +106,7 @@ st.markdown("""
         line-height: 1;
     }
     .bari-logo span {
-        color: var(--bari-green);
+        color: var(--bari-blue);
     }
     .bari-header-title {
         font-size: 14px;
@@ -130,7 +132,7 @@ st.markdown("""
     .bari-header-dot {
         width: 7px; height: 7px;
         border-radius: 50%;
-        background: var(--bari-green);
+        background: var(--bari-blue);
         animation: pulse-dot 2s ease-in-out infinite;
     }
     @keyframes pulse-dot {
@@ -145,7 +147,7 @@ st.markdown("""
     }
     .step-num {
         width: 30px; height: 30px; border-radius: 8px;
-        background: var(--bari-green);
+        background: var(--bari-blue);
         color: white;
         display: flex; align-items: center; justify-content: center;
         font-size: 14px; font-weight: 700;
@@ -156,7 +158,7 @@ st.markdown("""
         color: var(--bari-gray-400) !important;
     }
     .step-title {
-        font-weight: 700; font-size: 16px; color: var(--bari-dark);
+        font-weight: 700; font-size: 16px; color: var(--bari-navy);
     }
     .step-sub {
         font-size: 12px; color: var(--bari-gray-400); margin-left: 4px;
@@ -184,8 +186,8 @@ st.markdown("""
         background: var(--bari-gray-50) !important;
     }
     div[data-testid="stFileUploaderDropzone"]:hover {
-        border-color: var(--bari-green) !important;
-        background: var(--bari-green-light) !important;
+        border-color: var(--bari-blue) !important;
+        background: var(--bari-blue-light) !important;
     }
     div[data-testid="stFileUploaderDropzone"] > div > span {
         font-size: 12px !important;
@@ -195,14 +197,14 @@ st.markdown("""
         font-size: 12px !important;
         padding: 5px 14px !important;
         border-radius: 8px !important;
-        background: var(--bari-green) !important;
+        background: var(--bari-blue) !important;
         color: white !important;
         border: none !important;
     }
 
     /* ═══ BADGES ═══ */
     .badge-ok {
-        background: var(--bari-green-light); color: var(--bari-green-dark);
+        background: var(--bari-blue-light); color: var(--bari-blue-dark);
         padding: 2px 10px; border-radius: 6px;
         font-size: 10px; font-weight: 700;
         letter-spacing: 0.5px;
@@ -222,7 +224,7 @@ st.markdown("""
         border: 1px solid var(--bari-gray-100);
         border-top: 3px solid;
     }
-    .date-card-green  { border-top-color: var(--bari-green); }
+    .date-card-green  { border-top-color: var(--bari-blue); }
     .date-card-blue   { border-top-color: #3B82F6; }
     .date-card-purple { border-top-color: #8B5CF6; }
     .date-label {
@@ -231,7 +233,7 @@ st.markdown("""
         margin-bottom: 6px;
     }
     .date-value { font-size: 20px; font-weight: 800; }
-    .date-green  .date-value { color: var(--bari-green-dark); }
+    .date-green  .date-value { color: var(--bari-blue-dark); }
     .date-blue   .date-value { color: #2563EB; }
     .date-purple .date-value { color: #7C3AED; }
 
@@ -241,12 +243,12 @@ st.markdown("""
         padding: 14px 18px; border: 1px solid var(--bari-gray-100);
         font-size: 13px; color: var(--bari-gray-600);
         line-height: 1.5; margin-bottom: 14px;
-        border-left: 3px solid var(--bari-green);
+        border-left: 3px solid var(--bari-blue);
     }
 
     /* ═══ LOG PANEL ═══ */
     .log-panel {
-        background: var(--bari-dark-2);
+        background: var(--bari-navy-2);
         border-radius: 10px;
         padding: 16px 18px;
         max-height: 340px;
@@ -254,7 +256,7 @@ st.markdown("""
         font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
         font-size: 11.5px;
         line-height: 1.7;
-        border: 1px solid rgba(0,168,104,0.15);
+        border: 1px solid rgba(74,144,226,0.15);
     }
     .log-normal  { color: #cbd5e1; }
     .log-success { color: #4ade80; }
@@ -264,10 +266,10 @@ st.markdown("""
 
     /* ═══ SUCCESS BANNER ═══ */
     .success-banner {
-        background: linear-gradient(135deg, var(--bari-green-light) 0%, #D1FAE5 100%);
+        background: linear-gradient(135deg, var(--bari-blue-light) 0%, #DBEAFE 100%);
         border-radius: 12px;
         padding: 28px 32px;
-        border: 2px solid var(--bari-green);
+        border: 2px solid var(--bari-blue);
         text-align: center;
     }
 
@@ -286,7 +288,7 @@ st.markdown("""
     /* ═══ BUTTONS ═══ */
     .stButton > button[kind="primary"],
     .stDownloadButton > button {
-        background: var(--bari-green) !important;
+        background: var(--bari-blue) !important;
         color: white !important;
         border-radius: 10px !important;
         font-weight: 700 !important;
@@ -298,8 +300,8 @@ st.markdown("""
     }
     .stButton > button[kind="primary"]:hover,
     .stDownloadButton > button:hover {
-        background: var(--bari-green-dark) !important;
-        box-shadow: 0 4px 16px rgba(0,168,104,0.3) !important;
+        background: var(--bari-blue-dark) !important;
+        box-shadow: 0 4px 16px rgba(74,144,226,0.3) !important;
     }
 
     /* ═══ TOGGLE ═══ */
@@ -323,7 +325,7 @@ st.markdown("""
     .upload-label {
         font-weight: 700;
         font-size: 13px;
-        color: var(--bari-dark);
+        color: var(--bari-navy);
         margin-bottom: 2px;
     }
     .upload-label-req {
@@ -1047,7 +1049,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     log("\n✅ Apresentação gerada com sucesso!")
     log("🎉 Pronto! Baixe o arquivo abaixo.")
     progress_bar.progress(1.0)
-    status_text.markdown("<span style='font-size:13px;color:#065f46;font-weight:700'>✅ Concluído!</span>", unsafe_allow_html=True)
+    status_text.markdown("<span style='font-size:13px;color:#2563EB;font-weight:700'>✅ Concluído!</span>", unsafe_allow_html=True)
 
     return output.getvalue(), logs
 
@@ -1184,9 +1186,9 @@ def main():
     # ── Step 3: Gerar ──
     can_generate = f_funil is not None and f_pptx is not None
 
-    step_bg = "var(--bari-green)" if can_generate else "var(--bari-gray-200)"
+    step_bg = "var(--bari-blue)" if can_generate else "var(--bari-gray-200)"
     step_color = "white" if can_generate else "var(--bari-gray-400)"
-    title_color = "var(--bari-dark)" if can_generate else "var(--bari-gray-400)"
+    title_color = "var(--bari-navy)" if can_generate else "var(--bari-gray-400)"
 
     st.markdown(f"""
     <div class="step-header">
@@ -1202,7 +1204,7 @@ def main():
         if f_leads: parts.append("Leads")
         if f_plan: parts.append("Planejamento")
         st.markdown(f"""<div class="summary-box">
-            <strong style="color:#1a1a2e">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#065f46">{f_pptx.name}</strong>
+            <strong style="color:#0A1628">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#2563EB">{f_pptx.name}</strong>
         </div>""", unsafe_allow_html=True)
 
     if not can_generate:
@@ -1234,7 +1236,7 @@ def main():
 
             st.markdown("""<div class="success-banner">
                 <div style="font-size:40px;margin-bottom:8px">🎉</div>
-                <div style="font-size:18px;font-weight:800;color:#065f46;margin-bottom:4px">Apresentação pronta!</div>
+                <div style="font-size:18px;font-weight:800;color:#2563EB;margin-bottom:4px">Apresentação pronta!</div>
             </div>""", unsafe_allow_html=True)
 
             st.download_button(
