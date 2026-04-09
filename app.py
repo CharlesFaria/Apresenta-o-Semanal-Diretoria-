@@ -32,176 +32,229 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
-    /* Global */
-    .stApp { font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif !important; }
-    .block-container { max-width: 920px !important; padding-top: 0 !important; }
+    /* ═══ BARI BRAND TOKENS ═══ */
+    :root {
+        --bari-green: #00A868;
+        --bari-green-dark: #008C56;
+        --bari-green-light: #E6F7F0;
+        --bari-dark: #1A1A2E;
+        --bari-dark-2: #0D0D1A;
+        --bari-gray-50: #F7F8FA;
+        --bari-gray-100: #EEF0F4;
+        --bari-gray-200: #D8DCE4;
+        --bari-gray-400: #9CA3B4;
+        --bari-gray-600: #5A6275;
+        --bari-gray-800: #2D3142;
+        --bari-white: #FFFFFF;
+        --bari-orange: #FF8C42;
+        --bari-red: #E53E3E;
+    }
+
+    /* ═══ GLOBAL ═══ */
+    .stApp {
+        font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif !important;
+        background: var(--bari-gray-50) !important;
+    }
+    .block-container { max-width: 940px !important; padding-top: 0 !important; }
     header[data-testid="stHeader"] { display: none !important; }
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     div[data-testid="stDecoration"] { display: none !important; }
 
-    /* Header custom */
+    /* ═══ HEADER ═══ */
     .bari-header {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);
-        padding: 28px 36px 24px;
-        border-radius: 0 0 18px 18px;
-        margin: -1rem -1rem 28px -1rem;
+        background: var(--bari-dark-2);
+        padding: 0;
+        margin: -1rem -1rem 32px -1rem;
         color: white;
         position: relative;
         overflow: hidden;
     }
+    .bari-header-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 36px;
+        position: relative;
+        z-index: 2;
+    }
+    .bari-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--bari-green) 0%, var(--bari-green-dark) 50%, transparent 100%);
+    }
+    /* Decorative dots pattern */
     .bari-header::before {
         content: '';
         position: absolute;
-        top: -60px; right: -60px;
-        width: 200px; height: 200px;
+        top: 0; right: 0;
+        width: 300px; height: 100%;
+        background: radial-gradient(circle at 2px 2px, rgba(0,168,104,0.08) 1px, transparent 0);
+        background-size: 20px 20px;
+    }
+    .bari-logo {
+        font-size: 32px;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        color: white;
+        line-height: 1;
+    }
+    .bari-logo span {
+        color: var(--bari-green);
+    }
+    .bari-header-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255,255,255,0.5);
+        margin-top: 2px;
+        letter-spacing: 0.3px;
+    }
+    .bari-header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255,255,255,0.06);
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    .bari-header-right span {
+        font-size: 12px;
+        color: rgba(255,255,255,0.45);
+        font-weight: 500;
+    }
+    .bari-header-dot {
+        width: 7px; height: 7px;
         border-radius: 50%;
-        background: rgba(255,255,255,0.03);
+        background: var(--bari-green);
+        animation: pulse-dot 2s ease-in-out infinite;
     }
-    .bari-header h1 {
-        margin: 0; font-size: 1.6rem; font-weight: 800;
-        letter-spacing: -0.5px;
-    }
-    .bari-header p {
-        margin: 4px 0 0; font-size: 0.85rem; opacity: 0.65;
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
 
-    /* Step headers */
+    /* ═══ SECTION HEADERS ═══ */
     .step-header {
-        display: flex; align-items: center; gap: 10px;
-        margin-bottom: 14px; margin-top: 6px;
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 16px; margin-top: 8px;
     }
     .step-num {
-        width: 28px; height: 28px; border-radius: 50%;
-        background: #1a1a2e; color: white;
+        width: 30px; height: 30px; border-radius: 8px;
+        background: var(--bari-green);
+        color: white;
         display: flex; align-items: center; justify-content: center;
-        font-size: 13px; font-weight: 800;
+        font-size: 14px; font-weight: 700;
         flex-shrink: 0;
     }
+    .step-num-inactive {
+        background: var(--bari-gray-200) !important;
+        color: var(--bari-gray-400) !important;
+    }
     .step-title {
-        font-weight: 700; font-size: 15px; color: #1a1a2e;
+        font-weight: 700; font-size: 16px; color: var(--bari-dark);
     }
     .step-sub {
-        font-size: 12px; color: #94a3b8; margin-left: 4px;
+        font-size: 12px; color: var(--bari-gray-400); margin-left: 4px;
     }
 
-    /* File upload cards */
-    .upload-card {
-        border: 2px dashed #e2e8f0;
-        border-radius: 14px;
-        padding: 18px 16px;
-        background: white;
+    /* ═══ CARDS BASE ═══ */
+    .bari-card {
+        background: var(--bari-white);
+        border-radius: 12px;
+        border: 1px solid var(--bari-gray-100);
+        padding: 20px 22px;
         transition: all 0.2s ease;
-        min-height: 92px;
     }
-    .upload-card:hover {
-        border-color: #cbd5e1;
-        background: #fafbfc;
+    .bari-card:hover {
+        border-color: var(--bari-gray-200);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
     }
-    .upload-card.has-file {
-        border-style: solid;
-    }
-    .upload-card-blue.has-file    { border-color: #3b82f6; background: #eff6ff; }
-    .upload-card-green.has-file   { border-color: #22c55e; background: #f0fdf4; }
-    .upload-card-purple.has-file  { border-color: #a855f7; background: #faf5ff; }
-    .upload-card-amber.has-file   { border-color: #f59e0b; background: #fffbeb; }
 
-    .upload-icon {
-        width: 40px; height: 40px; border-radius: 10px;
-        display: inline-flex; align-items: center; justify-content: center;
-        font-size: 18px; flex-shrink: 0;
+    /* ═══ FILE UPLOAD AREA ═══ */
+    .stFileUploader > div > div { padding: 6px !important; }
+    div[data-testid="stFileUploaderDropzone"] {
+        padding: 10px !important;
+        border-radius: 10px !important;
+        border-color: var(--bari-gray-200) !important;
+        background: var(--bari-gray-50) !important;
     }
-    .upload-icon.empty { background: #f1f5f9; }
-    .upload-icon.blue  { background: #3b82f6; }
-    .upload-icon.green { background: #22c55e; }
-    .upload-icon.purple { background: #a855f7; }
-    .upload-icon.amber { background: #f59e0b; }
+    div[data-testid="stFileUploaderDropzone"]:hover {
+        border-color: var(--bari-green) !important;
+        background: var(--bari-green-light) !important;
+    }
+    div[data-testid="stFileUploaderDropzone"] > div > span {
+        font-size: 12px !important;
+        color: var(--bari-gray-400) !important;
+    }
+    div[data-testid="stFileUploaderDropzone"] button {
+        font-size: 12px !important;
+        padding: 5px 14px !important;
+        border-radius: 8px !important;
+        background: var(--bari-green) !important;
+        color: white !important;
+        border: none !important;
+    }
 
-    .upload-title {
-        font-weight: 700; font-size: 13px; color: #1a1a2e;
-        margin-bottom: 1px;
-    }
-    .upload-sub {
-        font-size: 11.5px; color: #94a3b8; line-height: 1.3;
-    }
-    .upload-filename {
-        font-weight: 600; font-size: 11.5px;
-    }
-    .file-blue   .upload-filename { color: #1e40af; }
-    .file-green  .upload-filename { color: #166534; }
-    .file-purple .upload-filename { color: #6b21a8; }
-    .file-amber  .upload-filename { color: #92400e; }
-
+    /* ═══ BADGES ═══ */
     .badge-ok {
-        background: #d1fae5; color: #065f46;
-        padding: 2px 8px; border-radius: 20px;
+        background: var(--bari-green-light); color: var(--bari-green-dark);
+        padding: 2px 10px; border-radius: 6px;
         font-size: 10px; font-weight: 700;
         letter-spacing: 0.5px;
     }
     .badge-req {
-        background: #fef3c7; color: #92400e;
-        padding: 2px 8px; border-radius: 20px;
+        background: #FFF3E0; color: var(--bari-orange);
+        padding: 2px 10px; border-radius: 6px;
         font-size: 10px; font-weight: 700;
         letter-spacing: 0.5px;
     }
 
-    /* File uploader styling */
-    .stFileUploader > div > div { padding: 6px !important; }
-    div[data-testid="stFileUploaderDropzone"] {
-        padding: 8px !important;
-    }
-    div[data-testid="stFileUploaderDropzone"] > div > span {
-        font-size: 12px !important;
-        color: #94a3b8 !important;
-    }
-    div[data-testid="stFileUploaderDropzone"] button {
-        font-size: 12px !important;
-        padding: 4px 12px !important;
-        border-radius: 8px !important;
-    }
-
-    /* Date cards */
+    /* ═══ DATE CARDS ═══ */
     .date-card {
-        background: #f8fafc;
+        background: var(--bari-white);
         border-radius: 10px;
-        padding: 12px 14px;
-        border-left: 3px solid;
+        padding: 14px 16px;
+        border: 1px solid var(--bari-gray-100);
+        border-top: 3px solid;
     }
-    .date-card-green  { border-left-color: #065f46; }
-    .date-card-blue   { border-left-color: #1d4ed8; }
-    .date-card-purple { border-left-color: #6d28d9; }
+    .date-card-green  { border-top-color: var(--bari-green); }
+    .date-card-blue   { border-top-color: #3B82F6; }
+    .date-card-purple { border-top-color: #8B5CF6; }
     .date-label {
-        font-size: 10px; color: #94a3b8; font-weight: 600;
-        text-transform: uppercase; letter-spacing: 0.5px;
-        margin-bottom: 4px;
+        font-size: 10px; color: var(--bari-gray-400); font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.8px;
+        margin-bottom: 6px;
     }
-    .date-value {
-        font-size: 18px; font-weight: 700;
-    }
-    .date-green  .date-value { color: #065f46; }
-    .date-blue   .date-value { color: #1d4ed8; }
-    .date-purple .date-value { color: #6d28d9; }
+    .date-value { font-size: 20px; font-weight: 800; }
+    .date-green  .date-value { color: var(--bari-green-dark); }
+    .date-blue   .date-value { color: #2563EB; }
+    .date-purple .date-value { color: #7C3AED; }
 
-    /* Summary */
+    /* ═══ SUMMARY ═══ */
     .summary-box {
-        background: white; border-radius: 12px;
-        padding: 14px 18px; border: 1px solid #e2e8f0;
-        font-size: 12.5px; color: #64748b;
+        background: var(--bari-white); border-radius: 10px;
+        padding: 14px 18px; border: 1px solid var(--bari-gray-100);
+        font-size: 13px; color: var(--bari-gray-600);
         line-height: 1.5; margin-bottom: 14px;
+        border-left: 3px solid var(--bari-green);
     }
 
-    /* Log panel */
+    /* ═══ LOG PANEL ═══ */
     .log-panel {
-        background: #0f172a;
-        border-radius: 12px;
+        background: var(--bari-dark-2);
+        border-radius: 10px;
         padding: 16px 18px;
         max-height: 340px;
         overflow-y: auto;
         font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
         font-size: 11.5px;
         line-height: 1.7;
+        border: 1px solid rgba(0,168,104,0.15);
     }
     .log-normal  { color: #cbd5e1; }
     .log-success { color: #4ade80; }
@@ -209,44 +262,81 @@ st.markdown("""
     .log-error   { color: #f87171; }
     .log-info    { color: #60a5fa; }
 
-    /* Success banner */
+    /* ═══ SUCCESS BANNER ═══ */
     .success-banner {
-        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-        border-radius: 16px;
+        background: linear-gradient(135deg, var(--bari-green-light) 0%, #D1FAE5 100%);
+        border-radius: 12px;
         padding: 28px 32px;
-        border: 2px solid #86efac;
+        border: 2px solid var(--bari-green);
         text-align: center;
     }
 
-    /* Note box */
+    /* ═══ NOTE BOX ═══ */
     .note-box {
-        background: #fffbeb;
-        border-radius: 12px;
+        background: #FFF8F0;
+        border-radius: 10px;
         padding: 14px 18px;
-        border: 1px solid #fde68a;
-        font-size: 12.5px;
-        color: #92400e;
+        border: 1px solid #FFDDB5;
+        border-left: 3px solid var(--bari-orange);
+        font-size: 13px;
+        color: #7C4A1E;
         line-height: 1.5;
     }
 
-    /* Primary button override */
+    /* ═══ BUTTONS ═══ */
     .stButton > button[kind="primary"],
     .stDownloadButton > button {
-        border-radius: 14px !important;
-        font-weight: 800 !important;
+        background: var(--bari-green) !important;
+        color: white !important;
+        border-radius: 10px !important;
+        font-weight: 700 !important;
         letter-spacing: 0.3px !important;
         padding: 14px 24px !important;
         font-size: 15px !important;
         border: none !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton > button[kind="primary"]:hover,
+    .stDownloadButton > button:hover {
+        background: var(--bari-green-dark) !important;
+        box-shadow: 0 4px 16px rgba(0,168,104,0.3) !important;
     }
 
-    /* Toggle */
+    /* ═══ TOGGLE ═══ */
     .stToggle label span { font-size: 13px !important; }
 
-    /* Divider */
+    /* ═══ EXPANDER ═══ */
+    .streamlit-expanderHeader {
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        color: var(--bari-gray-600) !important;
+    }
+
+    /* ═══ DIVIDER ═══ */
     .soft-divider {
-        height: 1px; background: #f1f5f9;
-        margin: 24px 0;
+        height: 1px;
+        background: linear-gradient(90deg, var(--bari-gray-100) 0%, transparent 100%);
+        margin: 28px 0;
+    }
+
+    /* ═══ LABEL STYLING ═══ */
+    .upload-label {
+        font-weight: 700;
+        font-size: 13px;
+        color: var(--bari-dark);
+        margin-bottom: 2px;
+    }
+    .upload-label-req {
+        display: inline-block;
+        background: #FFF3E0;
+        color: var(--bari-orange);
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+        letter-spacing: 0.5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1002,11 +1092,14 @@ def main():
     # ── Header ──
     st.markdown("""
     <div class="bari-header">
-        <div style="display:flex;align-items:center;gap:14px">
-            <div style="width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:22px">📊</div>
+        <div class="bari-header-inner">
             <div>
-                <h1>Slides Semanais</h1>
-                <p>Banco Bari — Diretoria Comercial</p>
+                <div class="bari-logo">bari<span>.</span></div>
+                <div class="bari-header-title">Slides Semanais — Diretoria Comercial</div>
+            </div>
+            <div class="bari-header-right">
+                <div class="bari-header-dot"></div>
+                <span>Gerador de Apresentações</span>
             </div>
         </div>
     </div>
@@ -1091,9 +1184,9 @@ def main():
     # ── Step 3: Gerar ──
     can_generate = f_funil is not None and f_pptx is not None
 
-    step_bg = "#1a1a2e" if can_generate else "#e2e8f0"
-    step_color = "white" if can_generate else "#94a3b8"
-    title_color = "#1a1a2e" if can_generate else "#94a3b8"
+    step_bg = "var(--bari-green)" if can_generate else "var(--bari-gray-200)"
+    step_color = "white" if can_generate else "var(--bari-gray-400)"
+    title_color = "var(--bari-dark)" if can_generate else "var(--bari-gray-400)"
 
     st.markdown(f"""
     <div class="step-header">
