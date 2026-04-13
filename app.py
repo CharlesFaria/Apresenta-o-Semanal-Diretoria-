@@ -787,7 +787,8 @@ def fmt_num(v):
 
 
 def gerar_dashboard_png(canal, metricas_plan, metricas_mes, metricas_sem, metricas_real,
-                         ref=None, re_start=None, re_end=None, mp_start=None, mp_end=None, sw_start=None, sw_end=None):
+                         ref=None, re_start=None, re_end=None, mp_start=None, mp_end=None, sw_start=None, sw_end=None,
+                         pct_mtd_override=None):
     fases = FASES_DASH[canal]; convs = CONVERSOES_DASH[canal]; n_f = len(fases); n_c = len(convs)
     RH = 0.52; HDR_H = RH*1.30; SUB_H = RH*0.60; SEP_H = RH*0.40; CONV_H = RH*0.90
     fig_w = 10.0; fig_h = HDR_H + SUB_H + n_f*RH + SEP_H + n_c*CONV_H + 0.20
@@ -802,7 +803,7 @@ def gerar_dashboard_png(canal, metricas_plan, metricas_mes, metricas_sem, metric
     _ref = ref or pd.Timestamp.now(); _re_start = re_start or pd.Timestamp.now().replace(day=1)
     _re_end = re_end or pd.Timestamp.now(); _mp_start = mp_start or pd.Timestamp.now().replace(day=1)
     _mp_end = mp_end or pd.Timestamp.now(); _sw_start = sw_start or pd.Timestamp.now().replace(day=1)
-    _sw_end = sw_end or pd.Timestamp.now(); _pct_mtd = perc_mtd_ref(_ref)
+    _sw_end = sw_end or pd.Timestamp.now(); _pct_mtd = pct_mtd_override if pct_mtd_override is not None else perc_mtd_ref(_ref)
     HDR_DATES = ['', f"{MESES_PT[_ref.month]} {_ref.year} · MTD {_pct_mtd*100:.0f}%",
                  f"{_mp_start.strftime('%d/%m')} → {_mp_end.strftime('%d/%m')}",
                  f"{_sw_start.strftime('%d/%m')} → {_sw_end.strftime('%d/%m')}",
@@ -1042,7 +1043,8 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             metricas_plan = {f: (round(plan_raw[f]*pct_mtd) if plan_raw.get(f) else None) for f in FASES_DASH[canal]}
             resultado = calcular_metricas_dash_df(df_opps, df_leads, canal, re_start, re_end, mp_start, mp_end, sw_start, sw_end)
             png = gerar_dashboard_png(canal, metricas_plan, resultado['mes_passado'], resultado['semana'], resultado['realizado'],
-                                       ref=REF, re_start=re_start, re_end=re_end, mp_start=mp_start, mp_end=mp_end, sw_start=sw_start, sw_end=sw_end)
+                                       ref=REF, re_start=re_start, re_end=re_end, mp_start=mp_start, mp_end=mp_end, sw_start=sw_start, sw_end=sw_end,
+                                       pct_mtd_override=pct_mtd)
             slide = prs.slides[idx]; remover_funis_existentes(slide); add_img(slide, png, POS_DASH)
             log(f"  Slide {num:2d} — {canal} ✅")
             advance(2)
