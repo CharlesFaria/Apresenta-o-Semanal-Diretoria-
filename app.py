@@ -916,8 +916,14 @@ def calcular_datas_auto():
 # ══════════════════════════════════════════════════════════════
 
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
-                   plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text):
+                   plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
+                   dist_mtd_user=None):
     """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
+    # Atualiza DIST_MTD com valores do usuário
+    if dist_mtd_user:
+        for m in range(1, 13):
+            DIST_MTD[m] = dist_mtd_user
+
     logs = []
     def log(msg):
         logs.append(msg)
@@ -1118,9 +1124,9 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**📈 Base do Funil** `OBRIGATÓRIO`", help="Atualizar Entrada nas Fases.xlsx")
-        st.caption("Exportação do Salesforce — Atualizar Entrada nas Fases.xlsx")
-        f_funil = st.file_uploader("Base do Funil", type=["xlsx"], key="f_funil", label_visibility="collapsed")
+        st.markdown("**📈 Base de Oportunidades** `OBRIGATÓRIO`", help="Exportação completa do Salesforce")
+        st.caption("Atualizar Entrada nas Fases.xlsx — use a base completa (período amplo)")
+        f_opps = st.file_uploader("Base Oportunidades", type=["xlsx"], key="f_opps", label_visibility="collapsed")
     with col2:
         st.markdown("**📑 Apresentação Modelo** `OBRIGATÓRIO`", help="Arquivo .pptx da diretoria")
         st.caption("Arquivo .pptx atual da diretoria")
@@ -1128,18 +1134,13 @@ def main():
 
     col3, col4 = st.columns(2)
     with col3:
-        st.markdown("**📊 Base Dashboard (Opps)**")
-        st.caption("Entrada nas Fases Dash.xlsx — período mais amplo")
-        f_dash = st.file_uploader("Base Dash", type=["xlsx"], key="f_dash", label_visibility="collapsed")
-    with col4:
-        st.markdown("**👥 Base Dashboard (Leads)**")
-        st.caption("Entradas nas Fases Leads Dash.xlsx")
+        st.markdown("**👥 Base de Leads**")
+        st.caption("Entradas nas Fases Leads.xlsx — para Lead/Workable Lead no dashboard")
         f_leads = st.file_uploader("Base Leads", type=["xlsx"], key="f_leads", label_visibility="collapsed")
-
-    # Planejamento (colapsável)
-    with st.expander("🎯 Planejamento — muda pouco, carregue apenas se necessário"):
-        st.caption("Planejamento.xlsx — metas mensais por canal")
-        f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
+    with col4:
+        with st.expander("🎯 Planejamento — muda pouco"):
+            st.caption("Planejamento.xlsx — metas mensais por canal")
+            f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
@@ -1183,8 +1184,26 @@ def main():
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
-    # ── Step 3: Gerar ──
-    can_generate = f_funil is not None and f_pptx is not None
+    # ── Distribuição MTD ──
+    with st.expander("📊 Distribuição semanal do planejamento (% MTD acumulado)"):
+        st.caption("Define quanto da meta mensal é esperado até cada semana. Sem1 = dias 1-7, Sem2 = 8-14, etc.")
+        mc1, mc2, mc3, mc4, mc5 = st.columns(5)
+        with mc1:
+            mtd_s1 = st.number_input("Sem 1 (%)", min_value=0, max_value=100, value=20, step=5, key="mtd1")
+        with mc2:
+            mtd_s2 = st.number_input("Sem 2 (%)", min_value=0, max_value=100, value=45, step=5, key="mtd2")
+        with mc3:
+            mtd_s3 = st.number_input("Sem 3 (%)", min_value=0, max_value=100, value=70, step=5, key="mtd3")
+        with mc4:
+            mtd_s4 = st.number_input("Sem 4 (%)", min_value=0, max_value=100, value=90, step=5, key="mtd4")
+        with mc5:
+            mtd_s5 = st.number_input("Sem 5 (%)", min_value=0, max_value=100, value=100, step=5, key="mtd5")
+
+    # Atualizar DIST_MTD global com os valores do usuário
+    dist_mtd_user = {1: mtd_s1/100, 2: mtd_s2/100, 3: mtd_s3/100, 4: mtd_s4/100, 5: mtd_s5/100}
+
+    st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
+    can_generate = f_opps is not None and f_pptx is not None
 
     step_bg = "var(--bari-blue)" if can_generate else "var(--bari-gray-200)"
     step_color = "white" if can_generate else "var(--bari-gray-400)"
@@ -1199,8 +1218,7 @@ def main():
 
     if can_generate:
         # Summary
-        parts = [f"Funis ({f_funil.name})"]
-        if f_dash: parts.append(f"Dashboards ({f_dash.name})")
+        parts = [f"Oportunidades ({f_opps.name})"]
         if f_leads: parts.append("Leads")
         if f_plan: parts.append("Planejamento")
         st.markdown(f"""<div class="summary-box">
@@ -1209,7 +1227,7 @@ def main():
 
     if not can_generate:
         st.markdown("""<div class="note-box">
-            ⏳ Carregue pelo menos a <strong>Base do Funil</strong> e a <strong>Apresentação Modelo</strong> para continuar.
+            ⏳ Carregue pelo menos a <strong>Base de Oportunidades</strong> e a <strong>Apresentação Modelo</strong> para continuar.
         </div>""", unsafe_allow_html=True)
         return
 
@@ -1218,10 +1236,11 @@ def main():
         status_text = st.empty()
 
         try:
+            opps_bytes = f_opps.read()
             result_bytes, log_lines = processar_tudo(
                 pptx_bytes=f_pptx.read(),
-                base_funil_bytes=f_funil.read(),
-                base_dash_bytes=f_dash.read() if f_dash else None,
+                base_funil_bytes=opps_bytes,
+                base_dash_bytes=opps_bytes,
                 base_leads_bytes=f_leads.read() if f_leads else None,
                 plan_bytes=f_plan.read() if f_plan else None,
                 data_atual=data_atual,
@@ -1229,6 +1248,7 @@ def main():
                 data_mes_ant=data_mes_ant,
                 progress_bar=progress_bar,
                 status_text=status_text,
+                dist_mtd_user=dist_mtd_user,
             )
 
             # Success
@@ -1265,11 +1285,10 @@ def main():
             import traceback
             st.code(traceback.format_exc())
 
-    # Nota quando faltam arquivos opcionais
-    if not f_dash and not st.session_state.get('_generated'):
+    # Nota sobre leads
+    if can_generate and not f_leads and not st.session_state.get('_generated'):
         st.markdown("""<div class="note-box" style="margin-top:14px">
-            <strong>Nota:</strong> Sem a base do Dashboard, apenas os funis serão gerados (slides 9-27).
-            Os dashboards (slides 13, 18, 23, 28, 29) precisam da base de Oportunidades Dash.
+            <strong>Nota:</strong> Sem a base de Leads, os campos Lead e Workable Lead nos dashboards ficarão zerados.
         </div>""", unsafe_allow_html=True)
 
 
