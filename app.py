@@ -917,7 +917,7 @@ def calcular_datas_auto():
 
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
                    plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
-                   dist_mtd_user=None):
+                   dist_mtd_user=None, semana_atual=3):
     """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
     # Atualiza DIST_MTD com valores do usuário
     if dist_mtd_user:
@@ -1037,7 +1037,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             idx = num - 1
             if idx >= len(prs.slides):
                 log(f"  ⚠️  Slide {num} não existe"); continue
-            mes = REF.month; pct_mtd = perc_mtd_ref(REF)
+            mes = REF.month; pct_mtd = DIST_MTD.get(mes, {}).get(semana_atual, perc_mtd_ref(REF))
             plan_raw = METAS_2026.get(canal, {}).get(mes, {})
             metricas_plan = {f: (round(plan_raw[f]*pct_mtd) if plan_raw.get(f) else None) for f in FASES_DASH[canal]}
             resultado = calcular_metricas_dash_df(df_opps, df_leads, canal, re_start, re_end, mp_start, mp_end, sw_start, sw_end)
@@ -1185,22 +1185,59 @@ def main():
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
     # ── Distribuição MTD ──
-    with st.expander("📊 Distribuição semanal do planejamento (% MTD acumulado)"):
-        st.caption("Define quanto da meta mensal é esperado até cada semana. Sem1 = dias 1-7, Sem2 = 8-14, etc.")
+    with st.expander("📊 Distribuição semanal do planejamento (% por semana · dias úteis)"):
+        st.caption("Digite o % de cada semana (baseado em dias úteis) e selecione em qual semana estamos.")
+
+        semana_atual = st.radio(
+            "Estamos na semana:",
+            options=[1, 2, 3, 4, 5],
+            format_func=lambda x: f"Sem {x}",
+            horizontal=True,
+            index=2,
+            key="semana_atual"
+        )
+
         mc1, mc2, mc3, mc4, mc5 = st.columns(5)
         with mc1:
-            mtd_s1 = st.number_input("Sem 1 (%)", min_value=0, max_value=100, value=20, step=5, key="mtd1")
+            pct_s1 = st.number_input("Sem 1 (%)", min_value=0.0, max_value=100.0, value=7.2, step=0.1, format="%.1f", key="mtd1")
         with mc2:
-            mtd_s2 = st.number_input("Sem 2 (%)", min_value=0, max_value=100, value=45, step=5, key="mtd2")
+            pct_s2 = st.number_input("Sem 2 (%)", min_value=0.0, max_value=100.0, value=21.0, step=0.1, format="%.1f", key="mtd2")
         with mc3:
-            mtd_s3 = st.number_input("Sem 3 (%)", min_value=0, max_value=100, value=70, step=5, key="mtd3")
+            pct_s3 = st.number_input("Sem 3 (%)", min_value=0.0, max_value=100.0, value=28.8, step=0.1, format="%.1f", key="mtd3")
         with mc4:
-            mtd_s4 = st.number_input("Sem 4 (%)", min_value=0, max_value=100, value=90, step=5, key="mtd4")
+            pct_s4 = st.number_input("Sem 4 (%)", min_value=0.0, max_value=100.0, value=21.0, step=0.1, format="%.1f", key="mtd4")
         with mc5:
-            mtd_s5 = st.number_input("Sem 5 (%)", min_value=0, max_value=100, value=100, step=5, key="mtd5")
+            pct_s5 = st.number_input("Sem 5 (%)", min_value=0.0, max_value=100.0, value=22.0, step=0.1, format="%.1f", key="mtd5")
 
-    # Atualizar DIST_MTD global com os valores do usuário
-    dist_mtd_user = {1: mtd_s1/100, 2: mtd_s2/100, 3: mtd_s3/100, 4: mtd_s4/100, 5: mtd_s5/100}
+        # Calcular acumulado
+        pcts = [pct_s1, pct_s2, pct_s3, pct_s4, pct_s5]
+        soma = sum(pcts)
+        acumulados = []
+        ac = 0
+        for p in pcts:
+            ac += p
+            acumulados.append(ac)
+
+        # Mostrar resumo com semana atual destacada
+        acum_parts = []
+        for i, a in enumerate(acumulados):
+            if i + 1 == semana_atual:
+                acum_parts.append(f"**[{a:.1f}%]**")
+            else:
+                acum_parts.append(f"{a:.1f}%")
+        acum_str = " → ".join(acum_parts)
+
+        if abs(soma - 100.0) < 0.5:
+            st.success(f"✅ Soma: {soma:.1f}%  ·  Acumulado: {acum_str}  ·  MTD atual (sem {semana_atual}): **{acumulados[semana_atual-1]:.1f}%**")
+        else:
+            st.warning(f"⚠️ Soma: {soma:.1f}% (deveria ser 100%)  ·  Acumulado: {acum_str}")
+
+    # Converter para dict acumulado normalizado (0 a 1)
+    ac = 0
+    dist_mtd_user = {}
+    for i, p in enumerate(pcts, 1):
+        ac += p
+        dist_mtd_user[i] = ac / 100
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
     can_generate = f_opps is not None and f_pptx is not None
@@ -1249,6 +1286,7 @@ def main():
                 progress_bar=progress_bar,
                 status_text=status_text,
                 dist_mtd_user=dist_mtd_user,
+                semana_atual=semana_atual,
             )
 
             # Success
