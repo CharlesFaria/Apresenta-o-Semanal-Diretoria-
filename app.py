@@ -1025,41 +1025,22 @@ def _cor_semaforo_ticket(pct_realizado):
 def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_func):
     """
     Gera imagem PNG de tabela estilo Bari (fundo branco, bordas pretas, espaçado).
+    Sem título/logo — já está na apresentação.
     canais_data: list of (label, [(valor, cor_bg), ...]) — uma tupla por coluna de dados
     fmt_func: função que formata o valor para string
     """
     n_cols = len(headers)
     n_rows = len(canais_data)
-    fig_w, fig_h = 9.6, 1.80 + n_rows * 0.78
+    fig_w, fig_h = 9.6, 0.60 + n_rows * 0.78
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     bg_color = 'white'
     fig.patch.set_facecolor(bg_color)
     ax.set_xlim(0, fig_w); ax.set_ylim(0, fig_h); ax.axis('off')
     ax.set_facecolor(bg_color)
 
-    # Título
-    ax.add_patch(plt.Rectangle((0.35, fig_h - 0.58), 0.26, 0.26,
-                 facecolor='#1a1a2e', edgecolor='none', zorder=3))
-    ax.text(0.75, fig_h - 0.44, titulo,
-            ha='left', va='center', fontsize=16, fontweight='bold', color='#1a1a2e', zorder=3)
-    if subtitulo:
-        ax.text(0.35, fig_h - 0.82, subtitulo,
-                ha='left', va='center', fontsize=9, color='#6b7280', zorder=3)
-        ax.text(0.35, fig_h - 1.04, 'GERAL',
-                ha='left', va='center', fontsize=9.5, fontweight='bold', color='#1a1a2e', zorder=3)
-    else:
-        ax.text(0.35, fig_h - 0.82, 'GERAL',
-                ha='left', va='center', fontsize=9.5, fontweight='bold', color='#1a1a2e', zorder=3)
-
-    # Logo bari
-    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.15, fig_h - 0.68), 0.82, 0.44,
-                 boxstyle="round,pad=0.06", facecolor='#1a1a2e', edgecolor='none', zorder=3))
-    ax.text(fig_w - 0.74, fig_h - 0.46, 'bari.', ha='center', va='center',
-            fontsize=12, fontweight='bold', color='white', zorder=4)
-
     # Layout de colunas
     label_w = 2.10
-    gap = 0.12  # espaço entre células
+    gap = 0.12
     total_data_w = fig_w - label_w - 0.50
     data_w = (total_data_w - gap * (n_cols - 2)) / (n_cols - 1)
     col_starts = [0.30]
@@ -1068,7 +1049,7 @@ def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_fu
 
     row_h = 0.66
     row_gap = 0.10
-    header_y = fig_h - 1.40 if subtitulo else fig_h - 1.15
+    header_y = fig_h - 0.30
     cell_pad = 0.06
 
     # Cabeçalhos
@@ -1181,8 +1162,8 @@ def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
         meta = metas_ticket.get(canal, 250000)
         pct = ticket / meta if meta > 0 else 0
         cells = [
-            (meta, '#EEF0F4'),      # Meta
-            (ticket, '#4A90E2'),     # Realizado — azul
+            (meta, '#EEF0F4'),      # Meta — cinza
+            (ticket, '#EEF0F4'),    # Realizado — cinza igual meta
             (pct, _cor_semaforo_ticket(pct)),  # % realizado
         ]
         canais_data.append((labels_map[canal], cells))
