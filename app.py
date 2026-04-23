@@ -913,12 +913,210 @@ def calcular_datas_auto():
     return atual, sem_pass, mes_ant
 
 # ══════════════════════════════════════════════════════════════
+# TAXA DE JUROS — PROCESSAMENTO E RENDERIZAÇÃO
+# ══════════════════════════════════════════════════════════════
+
+TAXA_CANAIS_MAP = {
+    'B2C': 'B2C',
+    'Correspondente': 'Parceiros\nCorrespondentes',
+    'Parceiro': 'Grandes\nParcerias',
+    'Relacionamento': 'Relacionamento',
+}
+TAXA_CANAIS_ORDEM = ['B2C', 'Correspondente', 'Parceiro', 'Relacionamento']
+
+METAS_TAXA_DEFAULT = {
+    'B2C': 0.0138,
+    'Correspondente': 0.0140,
+    'Parceiro': 0.0140,
+    'Relacionamento': 0.0140,
+    'Geral': 0.0138,
+}
+
+
+def processar_taxas(file_bytes):
+    """Processa base de taxas e retorna dict com resultados por canal."""
+    import numpy as np
+    df = pd.read_excel(io.BytesIO(file_bytes))
+
+    # Passo 0: Remover Derivadas
+    mask_deriv = df['Nome da oportunidade'].str.contains('Derivada', case=False, na=False)
+    df = df[~mask_deriv].copy()
+
+    # Passo 1: Extrair nome da pessoa
+    df['nome_pessoa'] = df['Nome da oportunidade'].apply(
+        lambda x: str(x).split(' - ')[0].strip().upper() if pd.notna(x) else ''
+    )
+
+    # Passo 2 & 3: Agrupar e consolidar renegociações
+    def consolidar_grupo(group):
+        if len(group) <= 1:
+            return group
+        reneg_mask = group['Nome da oportunidade'].str.contains('Renegociação', case=False, na=False)
+        if not reneg_mask.any():
+            return group
+        reneg_idx = group[reneg_mask].index[0]
+        soma_valor = group['Valor do Derivado'].sum()
+        result = group.copy()
+        result.loc[reneg_idx, 'Valor do Derivado'] = soma_valor
+        outras = result.index != reneg_idx
+        result.loc[outras, 'Valor do Derivado'] = 0
+        result.loc[outras, 'Taxa'] = 0
+        result.loc[outras, 'Taxa bonificada'] = np.nan
+        return result
+
+    df = df.groupby('nome_pessoa', group_keys=False).apply(consolidar_grupo)
+
+    # Passo 4: Calcular Taxa Nova
+    def calc_taxa_nova(row):
+        if pd.isna(row['Valor do Derivado']) or row['Valor do Derivado'] <= 0:
+            return 0
+        taxa = row['Taxa'] if pd.notna(row['Taxa']) else 0
+        taxa_bon = row['Taxa bonificada']
+        if pd.notna(taxa_bon):
+            return taxa_bon * 0.79 + taxa * 0.21
+        else:
+            return taxa
+
+    df['Taxa Nova'] = df.apply(calc_taxa_nova, axis=1)
+
+    # Filtrar valor > 0
+    df_pos = df[df['Valor do Derivado'] > 0].copy()
+
+    # Passo 5, 6, 7: Calcular por canal
+    resultados = {}
+    for canal in TAXA_CANAIS_ORDEM:
+        dc = df_pos[df_pos['Canal'] == canal]
+        if len(dc) == 0:
+            resultados[canal] = {'contratual': 0, 'ponderada': 0}
+            continue
+        sum_val = dc['Valor do Derivado'].sum()
+        contratual = (dc['Taxa'] * dc['Valor do Derivado']).sum() / sum_val
+        ponderada = (dc['Taxa Nova'] * dc['Valor do Derivado']).sum() / sum_val
+        resultados[canal] = {'contratual': contratual, 'ponderada': ponderada}
+
+    # Geral
+    sum_val_total = df_pos['Valor do Derivado'].sum()
+    if sum_val_total > 0:
+        contratual_geral = (df_pos['Taxa'] * df_pos['Valor do Derivado']).sum() / sum_val_total
+        ponderada_geral = (df_pos['Taxa Nova'] * df_pos['Valor do Derivado']).sum() / sum_val_total
+    else:
+        contratual_geral = ponderada_geral = 0
+    resultados['Geral'] = {'contratual': contratual_geral, 'ponderada': ponderada_geral}
+
+    return resultados
+
+
+def gerar_taxa_png(resultados, metas_taxa, mes_nome):
+    """Gera imagem PNG da tabela de taxa de juros estilo Banco Bari."""
+    fig_w, fig_h = 9.6, 4.8
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    bg_color = '#0B1120'
+    fig.patch.set_facecolor(bg_color)
+    ax.set_xlim(0, fig_w); ax.set_ylim(0, fig_h); ax.axis('off')
+    ax.set_facecolor(bg_color)
+
+    # Título
+    ax.add_patch(plt.Rectangle((0.30, fig_h - 0.65), 0.28, 0.28,
+                 facecolor='#2563EB', edgecolor='none', zorder=3))
+    ax.text(0.75, fig_h - 0.50, f'Taxa de juros Varejo  -  {mes_nome}',
+            ha='left', va='center', fontsize=16, fontweight='bold', color='white', zorder=3)
+    ax.text(0.30, fig_h - 0.90, 'Apenas novos contratos ou aditivos (sem derivadas)',
+            ha='left', va='center', fontsize=9, color='#94a3b8', zorder=3)
+    ax.text(0.30, fig_h - 1.12, 'GERAL',
+            ha='left', va='center', fontsize=10, fontweight='bold', color='white', zorder=3)
+
+    # Logo bari
+    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.20, fig_h - 0.75), 0.90, 0.50,
+                 boxstyle="round,pad=0.08", facecolor='#111111', edgecolor='none', zorder=3))
+    ax.text(fig_w - 0.75, fig_h - 0.50, 'bari.', ha='center', va='center',
+            fontsize=14, fontweight='bold', color='white', zorder=4)
+
+    # Tabela
+    col_x = [0.30, 2.80, 4.80, 6.80]  # label, meta, contratual, ponderada
+    col_w = [2.30, 1.80, 1.80, 1.80]
+    row_h = 0.58
+    header_y = fig_h - 1.55
+    cell_pad = 0.06
+
+    # Cabeçalhos
+    headers = ['', 'Meta', 'Contratual', 'Ponderada']
+    for i, (x, w, txt) in enumerate(zip(col_x, col_w, headers)):
+        if i == 0: continue
+        ax.text(x + w/2, header_y, txt, ha='center', va='center',
+                fontsize=11, fontweight='bold', color='#94a3b8', zorder=3)
+
+    # Linhas
+    canais_display = TAXA_CANAIS_ORDEM + ['Geral']
+    labels = {
+        'B2C': 'B2C',
+        'Correspondente': 'Parceiros\nCorrespondentes',
+        'Parceiro': 'Grandes\nParcerias',
+        'Relacionamento': 'Relacionamento',
+        'Geral': 'Geral',
+    }
+
+    for ri, canal in enumerate(canais_display):
+        y = header_y - (ri + 1) * row_h - 0.10
+        res = resultados.get(canal, {'contratual': 0, 'ponderada': 0})
+        meta = metas_taxa.get(canal, 0.0138)
+
+        # Separador antes de Geral
+        if canal == 'Geral':
+            ax.axhline(y + row_h - 0.05, xmin=0.03, xmax=0.97,
+                       color='#2a3a50', linewidth=1.0, zorder=2)
+
+        # Label do canal
+        ax.text(col_x[0] + col_w[0] - 0.10, y + row_h/2, labels[canal],
+                ha='right', va='center', fontsize=11,
+                fontweight='bold' if canal == 'Geral' else 'normal',
+                color='white', zorder=3, linespacing=1.3)
+
+        # Meta
+        meta_str = f"{meta*100:.2f}%".replace('.', ',')
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (col_x[1] + cell_pad, y + cell_pad), col_w[1] - 2*cell_pad, row_h - 2*cell_pad,
+            boxstyle="round,pad=0.05", facecolor='#1e2a3d', edgecolor='none', zorder=3))
+        ax.text(col_x[1] + col_w[1]/2, y + row_h/2, meta_str,
+                ha='center', va='center', fontsize=13, fontweight='bold',
+                color='white', family='monospace', zorder=4)
+
+        # Contratual
+        val_c = res['contratual']
+        cor_c = '#16A34A' if val_c <= meta else '#DC2626'
+        val_c_str = f"{val_c*100:.2f}%".replace('.', ',')
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (col_x[2] + cell_pad, y + cell_pad), col_w[2] - 2*cell_pad, row_h - 2*cell_pad,
+            boxstyle="round,pad=0.05", facecolor=cor_c, edgecolor='none', zorder=3))
+        ax.text(col_x[2] + col_w[2]/2, y + row_h/2, val_c_str,
+                ha='center', va='center', fontsize=13, fontweight='bold',
+                color='white', family='monospace', zorder=4)
+
+        # Ponderada
+        val_p = res['ponderada']
+        cor_p = '#16A34A' if val_p <= meta else '#DC2626'
+        val_p_str = f"{val_p*100:.2f}%".replace('.', ',')
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (col_x[3] + cell_pad, y + cell_pad), col_w[3] - 2*cell_pad, row_h - 2*cell_pad,
+            boxstyle="round,pad=0.05", facecolor=cor_p, edgecolor='none', zorder=3))
+        ax.text(col_x[3] + col_w[3]/2, y + row_h/2, val_p_str,
+                ha='center', va='center', fontsize=13, fontweight='bold',
+                color='white', family='monospace', zorder=4)
+
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor=bg_color)
+    plt.close()
+    buf.seek(0)
+    return buf.read()
+
+
+# ══════════════════════════════════════════════════════════════
 # PROCESSAMENTO PRINCIPAL
 # ══════════════════════════════════════════════════════════════
 
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
                    plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
-                   dist_mtd_user=None, semana_atual=3):
+                   dist_mtd_user=None, semana_atual=3, taxas_bytes=None, metas_taxa=None):
     """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
     # Atualiza DIST_MTD com valores do usuário
     if dist_mtd_user:
@@ -1051,6 +1249,37 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     else:
         log("\n⚠️ Sem base do dashboard — pulando dashboards")
 
+    # ── Slide de Taxa de Juros ──
+    if taxas_bytes:
+        advance(2, "💰 Gerando slide de taxas...")
+        log("\n💰 Gerando slide de Taxa de Juros...")
+        try:
+            resultados_taxa = processar_taxas(taxas_bytes)
+            _metas = metas_taxa or METAS_TAXA_DEFAULT
+            mes_nome = MESES_PT[data_atual.month]
+            png_taxa = gerar_taxa_png(resultados_taxa, _metas, mes_nome)
+
+            # Slide 7 (índice 6)
+            slide_taxa_idx = 6  # slide 7
+            if slide_taxa_idx < len(prs.slides):
+                slide = prs.slides[slide_taxa_idx]
+                remover_funis_existentes(slide)
+                add_img(slide, png_taxa, (0.30, 0.20, 9.40, 5.10))
+                log(f"  Slide 7 — Taxa de Juros ✅")
+            else:
+                log(f"  ⚠️ Slide 7 não existe")
+
+            # Log dos valores
+            for canal in TAXA_CANAIS_ORDEM + ['Geral']:
+                res = resultados_taxa.get(canal, {})
+                c = res.get('contratual', 0) * 100
+                p = res.get('ponderada', 0) * 100
+                log(f"     {canal:20s} | Contratual: {c:.2f}% | Ponderada: {p:.2f}%")
+        except Exception as e:
+            log(f"  ❌ Erro ao processar taxas: {str(e)}")
+    else:
+        log("\n⚠️ Sem base de taxas — pulando slide de Taxa de Juros")
+
     # Salvar
     advance(2, "💾 Salvando apresentação...")
     output = io.BytesIO(); prs.save(output); output.seek(0)
@@ -1140,9 +1369,13 @@ def main():
         st.caption("Entradas nas Fases Leads.xlsx — para Lead/Workable Lead no dashboard")
         f_leads = st.file_uploader("Base Leads", type=["xlsx"], key="f_leads", label_visibility="collapsed")
     with col4:
-        with st.expander("🎯 Planejamento — muda pouco"):
-            st.caption("Planejamento.xlsx — metas mensais por canal")
-            f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
+        st.markdown("**💰 Base de Taxas**")
+        st.caption("Valor efetivado com % de meta — para slide de Taxa de Juros")
+        f_taxas = st.file_uploader("Base Taxas", type=["xlsx"], key="f_taxas", label_visibility="collapsed")
+
+    with st.expander("🎯 Planejamento — muda pouco"):
+        st.caption("Planejamento.xlsx — metas mensais por canal")
+        f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
@@ -1242,6 +1475,25 @@ def main():
         dist_mtd_user[i] = ac / 100
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
+
+    # ── Metas de Taxa (só aparece se base de taxas foi carregada) ──
+    metas_taxa = dict(METAS_TAXA_DEFAULT)
+    if f_taxas:
+        with st.expander("💰 Metas de Taxa de Juros"):
+            st.caption("Ajuste as metas de taxa por canal (formato decimal, ex: 1.38 = 1,38%)")
+            mt1, mt2, mt3, mt4, mt5 = st.columns(5)
+            with mt1:
+                metas_taxa['B2C'] = st.number_input("B2C (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_b2c") / 100
+            with mt2:
+                metas_taxa['Correspondente'] = st.number_input("Corresp. (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_corresp") / 100
+            with mt3:
+                metas_taxa['Parceiro'] = st.number_input("Parceiro (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_parc") / 100
+            with mt4:
+                metas_taxa['Relacionamento'] = st.number_input("Relac. (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_rel") / 100
+            with mt5:
+                metas_taxa['Geral'] = st.number_input("Geral (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_geral") / 100
+
+    st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
     can_generate = f_opps is not None and f_pptx is not None
 
     step_bg = "var(--bari-blue)" if can_generate else "var(--bari-gray-200)"
@@ -1259,6 +1511,7 @@ def main():
         # Summary
         parts = [f"Oportunidades ({f_opps.name})"]
         if f_leads: parts.append("Leads")
+        if f_taxas: parts.append("Taxas")
         if f_plan: parts.append("Planejamento")
         st.markdown(f"""<div class="summary-box">
             <strong style="color:#0A1628">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#2563EB">{f_pptx.name}</strong>
@@ -1289,6 +1542,8 @@ def main():
                 status_text=status_text,
                 dist_mtd_user=dist_mtd_user,
                 semana_atual=semana_atual,
+                taxas_bytes=f_taxas.read() if f_taxas else None,
+                metas_taxa=metas_taxa,
             )
 
             # Success
