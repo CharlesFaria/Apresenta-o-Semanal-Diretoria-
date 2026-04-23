@@ -1024,13 +1024,13 @@ def _cor_semaforo_ticket(pct_realizado):
 
 def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_func):
     """
-    Gera imagem PNG de tabela estilo Bari (fundo branco).
+    Gera imagem PNG de tabela estilo Bari (fundo branco, bordas pretas, espaçado).
     canais_data: list of (label, [(valor, cor_bg), ...]) — uma tupla por coluna de dados
     fmt_func: função que formata o valor para string
     """
     n_cols = len(headers)
     n_rows = len(canais_data)
-    fig_w, fig_h = 9.6, 1.60 + n_rows * 0.68
+    fig_w, fig_h = 9.6, 1.80 + n_rows * 0.78
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     bg_color = 'white'
     fig.patch.set_facecolor(bg_color)
@@ -1038,50 +1038,57 @@ def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_fu
     ax.set_facecolor(bg_color)
 
     # Título
-    ax.add_patch(plt.Rectangle((0.30, fig_h - 0.55), 0.25, 0.25,
+    ax.add_patch(plt.Rectangle((0.35, fig_h - 0.58), 0.26, 0.26,
                  facecolor='#1a1a2e', edgecolor='none', zorder=3))
-    ax.text(0.70, fig_h - 0.42, titulo,
-            ha='left', va='center', fontsize=15, fontweight='bold', color='#1a1a2e', zorder=3)
-    ax.text(0.30, fig_h - 0.78, subtitulo,
-            ha='left', va='center', fontsize=8.5, color='#6b7280', zorder=3)
-    ax.text(0.30, fig_h - 0.98, 'GERAL',
-            ha='left', va='center', fontsize=9, fontweight='bold', color='#1a1a2e', zorder=3)
+    ax.text(0.75, fig_h - 0.44, titulo,
+            ha='left', va='center', fontsize=16, fontweight='bold', color='#1a1a2e', zorder=3)
+    if subtitulo:
+        ax.text(0.35, fig_h - 0.82, subtitulo,
+                ha='left', va='center', fontsize=9, color='#6b7280', zorder=3)
+        ax.text(0.35, fig_h - 1.04, 'GERAL',
+                ha='left', va='center', fontsize=9.5, fontweight='bold', color='#1a1a2e', zorder=3)
+    else:
+        ax.text(0.35, fig_h - 0.82, 'GERAL',
+                ha='left', va='center', fontsize=9.5, fontweight='bold', color='#1a1a2e', zorder=3)
 
     # Logo bari
-    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.10, fig_h - 0.65), 0.80, 0.42,
+    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.15, fig_h - 0.68), 0.82, 0.44,
                  boxstyle="round,pad=0.06", facecolor='#1a1a2e', edgecolor='none', zorder=3))
-    ax.text(fig_w - 0.70, fig_h - 0.44, 'bari.', ha='center', va='center',
+    ax.text(fig_w - 0.74, fig_h - 0.46, 'bari.', ha='center', va='center',
             fontsize=12, fontweight='bold', color='white', zorder=4)
 
     # Layout de colunas
-    label_w = 2.00
-    data_w = (fig_w - label_w - 0.60) / (n_cols - 1)
-    col_starts = [0.30]  # label column
+    label_w = 2.10
+    gap = 0.12  # espaço entre células
+    total_data_w = fig_w - label_w - 0.50
+    data_w = (total_data_w - gap * (n_cols - 2)) / (n_cols - 1)
+    col_starts = [0.30]
     for i in range(1, n_cols):
-        col_starts.append(label_w + 0.30 + (i - 1) * data_w)
+        col_starts.append(label_w + 0.20 + (i - 1) * (data_w + gap))
 
-    row_h = 0.58
-    header_y = fig_h - 1.30
-    cell_pad = 0.05
+    row_h = 0.66
+    row_gap = 0.10
+    header_y = fig_h - 1.40 if subtitulo else fig_h - 1.15
+    cell_pad = 0.06
 
     # Cabeçalhos
     for i, txt in enumerate(headers):
         if i == 0: continue
         ax.text(col_starts[i] + data_w / 2, header_y, txt,
-                ha='center', va='center', fontsize=10, fontweight='bold', color='#6b7280', zorder=3)
+                ha='center', va='center', fontsize=11, fontweight='bold', color='#6b7280', zorder=3)
 
     # Linhas de dados
     for ri, (label, cells) in enumerate(canais_data):
-        y = header_y - (ri + 1) * row_h - 0.08
+        y = header_y - (ri + 1) * (row_h + row_gap) + row_gap * 0.3
 
         # Separador antes de Geral
         if label == 'Geral':
-            ax.axhline(y + row_h - 0.02, xmin=0.03, xmax=0.97,
+            ax.axhline(y + row_h + row_gap * 0.4, xmin=0.03, xmax=0.97,
                        color='#d1d5db', linewidth=0.8, zorder=2)
 
         # Label
-        ax.text(col_starts[0] + label_w - 0.10, y + row_h / 2, label,
-                ha='right', va='center', fontsize=10.5,
+        ax.text(col_starts[0] + label_w - 0.15, y + row_h / 2, label,
+                ha='right', va='center', fontsize=11.5,
                 fontweight='bold' if label == 'Geral' else 'normal',
                 color='#1a1a2e', zorder=3, linespacing=1.3)
 
@@ -1089,12 +1096,15 @@ def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_fu
         for ci, (valor, cor_bg) in enumerate(cells):
             cx = col_starts[ci + 1]
             txt = fmt_func(valor)
+            # Fundo com borda preta
             ax.add_patch(mpatches.FancyBboxPatch(
                 (cx + cell_pad, y + cell_pad), data_w - 2 * cell_pad, row_h - 2 * cell_pad,
-                boxstyle="round,pad=0.05", facecolor=cor_bg, edgecolor='none', zorder=3))
-            txt_color = 'white' if cor_bg not in ('#f3f4f6', '#e5e7eb', '#E0E7EF') else '#1a1a2e'
+                boxstyle="round,pad=0.05", facecolor=cor_bg,
+                edgecolor='#1a1a2e', linewidth=1.5, zorder=3))
+            # Cor do texto
+            txt_color = '#2D3142' if cor_bg in ('#EEF0F4', '#f3f4f6', '#e5e7eb', '#E0E7EF') else 'white'
             ax.text(cx + data_w / 2, y + row_h / 2, txt,
-                    ha='center', va='center', fontsize=12.5, fontweight='bold',
+                    ha='center', va='center', fontsize=14, fontweight='bold',
                     color=txt_color, family='monospace', zorder=4)
 
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
@@ -1116,7 +1126,7 @@ def gerar_taxa_png(resultados, metas_taxa, mes_nome):
         res = resultados.get(canal, {'contratual': 0, 'ponderada': 0})
         meta = metas_taxa.get(canal, 0.0138)
         cells = [
-            (meta, '#E0E7EF'),  # Meta — fundo cinza claro
+            (meta, '#EEF0F4'),  # Meta — fundo cinza claro
             (res['contratual'], _cor_semaforo_taxa(res['contratual'], meta)),
             (res['ponderada'], _cor_semaforo_taxa(res['ponderada'], meta)),
         ]
@@ -1171,7 +1181,7 @@ def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
         meta = metas_ticket.get(canal, 250000)
         pct = ticket / meta if meta > 0 else 0
         cells = [
-            (meta, '#E0E7EF'),      # Meta
+            (meta, '#EEF0F4'),      # Meta
             (ticket, '#4A90E2'),     # Realizado — azul
             (pct, _cor_semaforo_ticket(pct)),  # % realizado
         ]
