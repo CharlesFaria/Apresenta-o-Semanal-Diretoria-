@@ -1006,101 +1006,96 @@ def processar_taxas(file_bytes):
     return resultados
 
 
-def gerar_taxa_png(resultados, metas_taxa, mes_nome):
-    """Gera imagem PNG da tabela de taxa de juros estilo Banco Bari."""
-    fig_w, fig_h = 9.6, 4.8
+def _cor_semaforo_taxa(valor, meta):
+    """Para taxas: verde se <= meta (bom), vermelho se > meta (ruim)."""
+    if valor <= meta:
+        return '#16A34A'
+    return '#DC2626'
+
+
+def _cor_semaforo_ticket(pct_realizado):
+    """Para ticket: verde 90-110%, amarelo >110%, vermelho <90%."""
+    if pct_realizado >= 1.10:
+        return '#EAB308'  # amarelo — muito acima
+    if pct_realizado >= 0.90:
+        return '#16A34A'  # verde — na meta
+    return '#DC2626'      # vermelho — abaixo
+
+
+def _gerar_tabela_bari(titulo, subtitulo, headers, canais_data, mes_nome, fmt_func):
+    """
+    Gera imagem PNG de tabela estilo Bari (fundo branco).
+    canais_data: list of (label, [(valor, cor_bg), ...]) — uma tupla por coluna de dados
+    fmt_func: função que formata o valor para string
+    """
+    n_cols = len(headers)
+    n_rows = len(canais_data)
+    fig_w, fig_h = 9.6, 1.60 + n_rows * 0.68
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    bg_color = '#0B1120'
+    bg_color = 'white'
     fig.patch.set_facecolor(bg_color)
     ax.set_xlim(0, fig_w); ax.set_ylim(0, fig_h); ax.axis('off')
     ax.set_facecolor(bg_color)
 
     # Título
-    ax.add_patch(plt.Rectangle((0.30, fig_h - 0.65), 0.28, 0.28,
-                 facecolor='#2563EB', edgecolor='none', zorder=3))
-    ax.text(0.75, fig_h - 0.50, f'Taxa de juros Varejo  -  {mes_nome}',
-            ha='left', va='center', fontsize=16, fontweight='bold', color='white', zorder=3)
-    ax.text(0.30, fig_h - 0.90, 'Apenas novos contratos ou aditivos (sem derivadas)',
-            ha='left', va='center', fontsize=9, color='#94a3b8', zorder=3)
-    ax.text(0.30, fig_h - 1.12, 'GERAL',
-            ha='left', va='center', fontsize=10, fontweight='bold', color='white', zorder=3)
+    ax.add_patch(plt.Rectangle((0.30, fig_h - 0.55), 0.25, 0.25,
+                 facecolor='#1a1a2e', edgecolor='none', zorder=3))
+    ax.text(0.70, fig_h - 0.42, titulo,
+            ha='left', va='center', fontsize=15, fontweight='bold', color='#1a1a2e', zorder=3)
+    ax.text(0.30, fig_h - 0.78, subtitulo,
+            ha='left', va='center', fontsize=8.5, color='#6b7280', zorder=3)
+    ax.text(0.30, fig_h - 0.98, 'GERAL',
+            ha='left', va='center', fontsize=9, fontweight='bold', color='#1a1a2e', zorder=3)
 
     # Logo bari
-    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.20, fig_h - 0.75), 0.90, 0.50,
-                 boxstyle="round,pad=0.08", facecolor='#111111', edgecolor='none', zorder=3))
-    ax.text(fig_w - 0.75, fig_h - 0.50, 'bari.', ha='center', va='center',
-            fontsize=14, fontweight='bold', color='white', zorder=4)
+    ax.add_patch(mpatches.FancyBboxPatch((fig_w - 1.10, fig_h - 0.65), 0.80, 0.42,
+                 boxstyle="round,pad=0.06", facecolor='#1a1a2e', edgecolor='none', zorder=3))
+    ax.text(fig_w - 0.70, fig_h - 0.44, 'bari.', ha='center', va='center',
+            fontsize=12, fontweight='bold', color='white', zorder=4)
 
-    # Tabela
-    col_x = [0.30, 2.80, 4.80, 6.80]  # label, meta, contratual, ponderada
-    col_w = [2.30, 1.80, 1.80, 1.80]
+    # Layout de colunas
+    label_w = 2.00
+    data_w = (fig_w - label_w - 0.60) / (n_cols - 1)
+    col_starts = [0.30]  # label column
+    for i in range(1, n_cols):
+        col_starts.append(label_w + 0.30 + (i - 1) * data_w)
+
     row_h = 0.58
-    header_y = fig_h - 1.55
-    cell_pad = 0.06
+    header_y = fig_h - 1.30
+    cell_pad = 0.05
 
     # Cabeçalhos
-    headers = ['', 'Meta', 'Contratual', 'Ponderada']
-    for i, (x, w, txt) in enumerate(zip(col_x, col_w, headers)):
+    for i, txt in enumerate(headers):
         if i == 0: continue
-        ax.text(x + w/2, header_y, txt, ha='center', va='center',
-                fontsize=11, fontweight='bold', color='#94a3b8', zorder=3)
+        ax.text(col_starts[i] + data_w / 2, header_y, txt,
+                ha='center', va='center', fontsize=10, fontweight='bold', color='#6b7280', zorder=3)
 
-    # Linhas
-    canais_display = TAXA_CANAIS_ORDEM + ['Geral']
-    labels = {
-        'B2C': 'B2C',
-        'Correspondente': 'Parceiros\nCorrespondentes',
-        'Parceiro': 'Grandes\nParcerias',
-        'Relacionamento': 'Relacionamento',
-        'Geral': 'Geral',
-    }
-
-    for ri, canal in enumerate(canais_display):
-        y = header_y - (ri + 1) * row_h - 0.10
-        res = resultados.get(canal, {'contratual': 0, 'ponderada': 0})
-        meta = metas_taxa.get(canal, 0.0138)
+    # Linhas de dados
+    for ri, (label, cells) in enumerate(canais_data):
+        y = header_y - (ri + 1) * row_h - 0.08
 
         # Separador antes de Geral
-        if canal == 'Geral':
-            ax.axhline(y + row_h - 0.05, xmin=0.03, xmax=0.97,
-                       color='#2a3a50', linewidth=1.0, zorder=2)
+        if label == 'Geral':
+            ax.axhline(y + row_h - 0.02, xmin=0.03, xmax=0.97,
+                       color='#d1d5db', linewidth=0.8, zorder=2)
 
-        # Label do canal
-        ax.text(col_x[0] + col_w[0] - 0.10, y + row_h/2, labels[canal],
-                ha='right', va='center', fontsize=11,
-                fontweight='bold' if canal == 'Geral' else 'normal',
-                color='white', zorder=3, linespacing=1.3)
+        # Label
+        ax.text(col_starts[0] + label_w - 0.10, y + row_h / 2, label,
+                ha='right', va='center', fontsize=10.5,
+                fontweight='bold' if label == 'Geral' else 'normal',
+                color='#1a1a2e', zorder=3, linespacing=1.3)
 
-        # Meta
-        meta_str = f"{meta*100:.2f}%".replace('.', ',')
-        ax.add_patch(mpatches.FancyBboxPatch(
-            (col_x[1] + cell_pad, y + cell_pad), col_w[1] - 2*cell_pad, row_h - 2*cell_pad,
-            boxstyle="round,pad=0.05", facecolor='#1e2a3d', edgecolor='none', zorder=3))
-        ax.text(col_x[1] + col_w[1]/2, y + row_h/2, meta_str,
-                ha='center', va='center', fontsize=13, fontweight='bold',
-                color='white', family='monospace', zorder=4)
-
-        # Contratual
-        val_c = res['contratual']
-        cor_c = '#16A34A' if val_c <= meta else '#DC2626'
-        val_c_str = f"{val_c*100:.2f}%".replace('.', ',')
-        ax.add_patch(mpatches.FancyBboxPatch(
-            (col_x[2] + cell_pad, y + cell_pad), col_w[2] - 2*cell_pad, row_h - 2*cell_pad,
-            boxstyle="round,pad=0.05", facecolor=cor_c, edgecolor='none', zorder=3))
-        ax.text(col_x[2] + col_w[2]/2, y + row_h/2, val_c_str,
-                ha='center', va='center', fontsize=13, fontweight='bold',
-                color='white', family='monospace', zorder=4)
-
-        # Ponderada
-        val_p = res['ponderada']
-        cor_p = '#16A34A' if val_p <= meta else '#DC2626'
-        val_p_str = f"{val_p*100:.2f}%".replace('.', ',')
-        ax.add_patch(mpatches.FancyBboxPatch(
-            (col_x[3] + cell_pad, y + cell_pad), col_w[3] - 2*cell_pad, row_h - 2*cell_pad,
-            boxstyle="round,pad=0.05", facecolor=cor_p, edgecolor='none', zorder=3))
-        ax.text(col_x[3] + col_w[3]/2, y + row_h/2, val_p_str,
-                ha='center', va='center', fontsize=13, fontweight='bold',
-                color='white', family='monospace', zorder=4)
+        # Cells
+        for ci, (valor, cor_bg) in enumerate(cells):
+            cx = col_starts[ci + 1]
+            txt = fmt_func(valor)
+            ax.add_patch(mpatches.FancyBboxPatch(
+                (cx + cell_pad, y + cell_pad), data_w - 2 * cell_pad, row_h - 2 * cell_pad,
+                boxstyle="round,pad=0.05", facecolor=cor_bg, edgecolor='none', zorder=3))
+            txt_color = 'white' if cor_bg not in ('#f3f4f6', '#e5e7eb', '#E0E7EF') else '#1a1a2e'
+            ax.text(cx + data_w / 2, y + row_h / 2, txt,
+                    ha='center', va='center', fontsize=12.5, fontweight='bold',
+                    color=txt_color, family='monospace', zorder=4)
 
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     buf = io.BytesIO()
@@ -1110,13 +1105,102 @@ def gerar_taxa_png(resultados, metas_taxa, mes_nome):
     return buf.read()
 
 
+def gerar_taxa_png(resultados, metas_taxa, mes_nome):
+    """Gera imagem PNG da tabela de taxa de juros."""
+    labels_map = {
+        'B2C': 'B2C', 'Correspondente': 'Parceiros\nCorrespondentes',
+        'Parceiro': 'Grandes\nParcerias', 'Relacionamento': 'Relacionamento', 'Geral': 'Geral',
+    }
+    canais_data = []
+    for canal in TAXA_CANAIS_ORDEM + ['Geral']:
+        res = resultados.get(canal, {'contratual': 0, 'ponderada': 0})
+        meta = metas_taxa.get(canal, 0.0138)
+        cells = [
+            (meta, '#E0E7EF'),  # Meta — fundo cinza claro
+            (res['contratual'], _cor_semaforo_taxa(res['contratual'], meta)),
+            (res['ponderada'], _cor_semaforo_taxa(res['ponderada'], meta)),
+        ]
+        canais_data.append((labels_map[canal], cells))
+
+    def fmt_taxa(v):
+        return f"{v*100:.2f}%".replace('.', ',')
+
+    return _gerar_tabela_bari(
+        titulo=f'Taxa de juros Varejo  -  {mes_nome}',
+        subtitulo='Apenas novos contratos ou aditivos (sem derivadas)',
+        headers=['', 'Meta', 'Contratual', 'Ponderada'],
+        canais_data=canais_data,
+        mes_nome=mes_nome,
+        fmt_func=fmt_taxa,
+    )
+
+
+def processar_ticket_medio(taxas_bytes, contratos_bytes):
+    """Calcula ticket médio por canal. Retorna dict {canal: ticket}."""
+    df_taxa = pd.read_excel(io.BytesIO(taxas_bytes))
+    df_contr = pd.read_excel(io.BytesIO(contratos_bytes))
+
+    # Volume por canal (COM derivadas)
+    vol_por_canal = df_taxa.groupby('Canal')['Valor do Derivado'].sum()
+    contr_por_canal = df_contr.groupby('Canal').size()
+
+    resultados = {}
+    total_vol = 0
+    total_contr = 0
+    for canal in TAXA_CANAIS_ORDEM:
+        vol = vol_por_canal.get(canal, 0)
+        contr = contr_por_canal.get(canal, 0)
+        ticket = vol / contr if contr > 0 else 0
+        resultados[canal] = ticket
+        total_vol += vol
+        total_contr += contr
+
+    resultados['Geral'] = total_vol / total_contr if total_contr > 0 else 0
+    return resultados
+
+
+def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
+    """Gera imagem PNG da tabela de ticket médio."""
+    labels_map = {
+        'B2C': 'B2C', 'Correspondente': 'Parceiros\nCorrespondentes',
+        'Parceiro': 'Grandes\nParcerias', 'Relacionamento': 'Relacionamento', 'Geral': 'Geral',
+    }
+    canais_data = []
+    for canal in TAXA_CANAIS_ORDEM + ['Geral']:
+        ticket = resultados_ticket.get(canal, 0)
+        meta = metas_ticket.get(canal, 250000)
+        pct = ticket / meta if meta > 0 else 0
+        cells = [
+            (meta, '#E0E7EF'),      # Meta
+            (ticket, '#4A90E2'),     # Realizado — azul
+            (pct, _cor_semaforo_ticket(pct)),  # % realizado
+        ]
+        canais_data.append((labels_map[canal], cells))
+
+    def fmt_ticket(v):
+        if isinstance(v, float) and v < 10:
+            # É percentual
+            return f"{v*100:.0f}%"
+        return f"{v:,.0f}".replace(',', '.')
+
+    return _gerar_tabela_bari(
+        titulo=f'Análise de ticket médio novos contratos - {mes_nome}',
+        subtitulo='',
+        headers=['', 'Meta', 'Realizado', '% realizado'],
+        canais_data=canais_data,
+        mes_nome=mes_nome,
+        fmt_func=fmt_ticket,
+    )
+
+
 # ══════════════════════════════════════════════════════════════
 # PROCESSAMENTO PRINCIPAL
 # ══════════════════════════════════════════════════════════════
 
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
                    plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
-                   dist_mtd_user=None, semana_atual=3, taxas_bytes=None, metas_taxa=None):
+                   dist_mtd_user=None, semana_atual=3, taxas_bytes=None, metas_taxa=None,
+                   contratos_bytes=None, metas_ticket=None):
     """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
     # Atualiza DIST_MTD com valores do usuário
     if dist_mtd_user:
@@ -1280,6 +1364,34 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     else:
         log("\n⚠️ Sem base de taxas — pulando slide de Taxa de Juros")
 
+    # ── Slide de Ticket Médio (slide 8) ──
+    if taxas_bytes and contratos_bytes:
+        advance(2, "📋 Gerando slide de ticket médio...")
+        log("\n📋 Gerando slide de Ticket Médio...")
+        try:
+            resultados_ticket = processar_ticket_medio(taxas_bytes, contratos_bytes)
+            _metas_tk = metas_ticket or {'B2C': 220882, 'Correspondente': 471614, 'Parceiro': 226959, 'Relacionamento': 162619, 'Geral': 270518}
+            mes_nome = MESES_PT[data_atual.month]
+            png_ticket = gerar_ticket_png(resultados_ticket, _metas_tk, mes_nome)
+
+            slide_ticket_idx = 7  # slide 8
+            if slide_ticket_idx < len(prs.slides):
+                slide = prs.slides[slide_ticket_idx]
+                remover_funis_existentes(slide)
+                add_img(slide, png_ticket, (0.30, 0.20, 9.40, 5.10))
+                log(f"  Slide 8 — Ticket Médio ✅")
+            else:
+                log(f"  ⚠️ Slide 8 não existe")
+
+            for canal in TAXA_CANAIS_ORDEM + ['Geral']:
+                ticket = resultados_ticket.get(canal, 0)
+                log(f"     {canal:20s} | Ticket: R${ticket:,.0f}")
+        except Exception as e:
+            log(f"  ❌ Erro ao processar ticket médio: {str(e)}")
+    else:
+        if not taxas_bytes or not contratos_bytes:
+            log("\n⚠️ Sem base de taxas ou contratos — pulando slide de Ticket Médio")
+
     # Salvar
     advance(2, "💾 Salvando apresentação...")
     output = io.BytesIO(); prs.save(output); output.seek(0)
@@ -1373,9 +1485,15 @@ def main():
         st.caption("Valor efetivado com % de meta — para slide de Taxa de Juros")
         f_taxas = st.file_uploader("Base Taxas", type=["xlsx"], key="f_taxas", label_visibility="collapsed")
 
-    with st.expander("🎯 Planejamento — muda pouco"):
-        st.caption("Planejamento.xlsx — metas mensais por canal")
-        f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
+    col5, col6 = st.columns(2)
+    with col5:
+        st.markdown("**📋 Base de Contratos**")
+        st.caption("Novos contratos com % de meta — para slide de Ticket Médio")
+        f_contratos = st.file_uploader("Base Contratos", type=["xlsx"], key="f_contratos", label_visibility="collapsed")
+    with col6:
+        with st.expander("🎯 Planejamento — muda pouco"):
+            st.caption("Planejamento.xlsx — metas mensais por canal")
+            f_plan = st.file_uploader("Planejamento", type=["xlsx"], key="f_plan", label_visibility="collapsed")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
@@ -1493,8 +1611,27 @@ def main():
             with mt5:
                 metas_taxa['Geral'] = st.number_input("Geral (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_geral") / 100
 
+    # ── Metas de Ticket Médio ──
+    metas_ticket = {
+        'B2C': 220882, 'Correspondente': 471614, 'Parceiro': 226959,
+        'Relacionamento': 162619, 'Geral': 270518,
+    }
+    if f_contratos and f_taxas:
+        with st.expander("📋 Metas de Ticket Médio"):
+            st.caption("Ajuste as metas de ticket médio por canal (valor em R$)")
+            tk1, tk2, tk3, tk4, tk5 = st.columns(5)
+            with tk1:
+                metas_ticket['B2C'] = st.number_input("B2C (R$)", min_value=0, value=220882, step=1000, key="meta_tk_b2c")
+            with tk2:
+                metas_ticket['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=471614, step=1000, key="meta_tk_corresp")
+            with tk3:
+                metas_ticket['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=226959, step=1000, key="meta_tk_parc")
+            with tk4:
+                metas_ticket['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=162619, step=1000, key="meta_tk_rel")
+            with tk5:
+                metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=270518, step=1000, key="meta_tk_geral")
+
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
-    can_generate = f_opps is not None and f_pptx is not None
 
     step_bg = "var(--bari-blue)" if can_generate else "var(--bari-gray-200)"
     step_color = "white" if can_generate else "var(--bari-gray-400)"
@@ -1512,6 +1649,7 @@ def main():
         parts = [f"Oportunidades ({f_opps.name})"]
         if f_leads: parts.append("Leads")
         if f_taxas: parts.append("Taxas")
+        if f_contratos: parts.append("Contratos")
         if f_plan: parts.append("Planejamento")
         st.markdown(f"""<div class="summary-box">
             <strong style="color:#0A1628">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#2563EB">{f_pptx.name}</strong>
@@ -1529,6 +1667,8 @@ def main():
 
         try:
             opps_bytes = f_opps.read()
+            taxas_bytes_read = f_taxas.read() if f_taxas else None
+            contratos_bytes_read = f_contratos.read() if f_contratos else None
             result_bytes, log_lines = processar_tudo(
                 pptx_bytes=f_pptx.read(),
                 base_funil_bytes=opps_bytes,
@@ -1542,8 +1682,10 @@ def main():
                 status_text=status_text,
                 dist_mtd_user=dist_mtd_user,
                 semana_atual=semana_atual,
-                taxas_bytes=f_taxas.read() if f_taxas else None,
+                taxas_bytes=taxas_bytes_read,
                 metas_taxa=metas_taxa,
+                contratos_bytes=contratos_bytes_read,
+                metas_ticket=metas_ticket,
             )
 
             # Success
