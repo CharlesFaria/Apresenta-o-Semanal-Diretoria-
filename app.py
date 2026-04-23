@@ -1633,6 +1633,9 @@ def main():
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
+    # ── Step 3: Gerar ──
+    can_generate = f_opps is not None and f_pptx is not None
+
     step_bg = "var(--bari-blue)" if can_generate else "var(--bari-gray-200)"
     step_color = "white" if can_generate else "var(--bari-gray-400)"
     title_color = "var(--bari-navy)" if can_generate else "var(--bari-gray-400)"
