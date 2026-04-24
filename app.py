@@ -1183,6 +1183,183 @@ def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
         fmt_func=fmt_ticket,
     )
 
+METAS_ORIG_DEFAULT = {
+    'B2C': 10350000, 'Correspondente': 18200000, 'Parceiro': 18150000,
+    'Relacionamento': 5400000, 'Compra de carteira': 3000000,
+}
+METAS_CONTR_DEFAULT = {
+    'B2C': 46, 'Correspondente': 38, 'Parceiro': 78, 'Relacionamento': 32,
+}
+
+
+def processar_originacao(taxas_bytes, contratos_bytes):
+    """Calcula valor originado (COM derivadas) e novos contratos por canal."""
+    df_taxa = pd.read_excel(io.BytesIO(taxas_bytes))
+    df_contr = pd.read_excel(io.BytesIO(contratos_bytes))
+
+    vol_por_canal = df_taxa.groupby('Canal')['Valor do Derivado'].sum()
+    contr_por_canal = df_contr.groupby('Canal').size()
+
+    resultados = {}
+    for canal in TAXA_CANAIS_ORDEM:
+        resultados[canal] = {
+            'valor': vol_por_canal.get(canal, 0),
+            'contratos': contr_por_canal.get(canal, 0),
+        }
+
+    # Compra de carteira (se existir)
+    val_carteira = vol_por_canal.get('Compra de carteira', 0)
+    contr_carteira = contr_por_canal.get('Compra de carteira', 0)
+    resultados['Compra de carteira'] = {'valor': val_carteira, 'contratos': contr_carteira}
+
+    return resultados
+
+
+def gerar_originacao_png(resultados, metas_orig, metas_contr):
+    """Gera imagem PNG da tabela de Originação + Novos Contratos (fundo branco, sem cores no %)."""
+    labels_map = {
+        'B2C': 'B2C', 'Correspondente': 'Parceiros\nCorrespondentes',
+        'Parceiro': 'Grandes\nParcerias', 'Relacionamento': 'Relacionamento',
+    }
+
+    canais = TAXA_CANAIS_ORDEM  # B2C, Correspondente, Parceiro, Relacionamento
+
+    # Calcular totais Varejo
+    varejo_val = sum(resultados.get(c, {}).get('valor', 0) for c in canais)
+    varejo_contr = sum(resultados.get(c, {}).get('contratos', 0) for c in canais)
+    varejo_meta_val = sum(metas_orig.get(c, 0) for c in canais)
+    varejo_meta_contr = sum(metas_contr.get(c, 0) for c in canais)
+
+    carteira = resultados.get('Compra de carteira', {})
+    carteira_val = carteira.get('valor', 0)
+    carteira_meta = metas_orig.get('Compra de carteira', 3000000)
+
+    total_val = varejo_val + carteira_val
+    total_meta_val = varejo_meta_val + carteira_meta
+
+    # Dimensões
+    n_rows = 7  # 4 canais + varejo + carteira + total
+    fig_w = 9.6
+    row_h = 0.66
+    row_gap = 0.10
+    header_h = 0.90  # espaço para headers duplos
+    fig_h = header_h + n_rows * (row_h + row_gap) + 0.40  # extra para separadores
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    fig.patch.set_facecolor('white')
+    ax.set_xlim(0, fig_w); ax.set_ylim(0, fig_h); ax.axis('off')
+
+    # Layout: label | orig(meta, real, %) | contr(meta, real, %)
+    label_w = 1.40
+    gap_sections = 0.25
+    orig_w = (fig_w - label_w - gap_sections - 0.30) * 0.6
+    contr_w = (fig_w - label_w - gap_sections - 0.30) * 0.4
+    orig_start = label_w + 0.15
+    contr_start = orig_start + orig_w + gap_sections
+
+    cell_gap = 0.08
+    cell_pad = 0.04
+
+    def draw_cell(x, y, w, h, text, bold=False, dash=False):
+        bg = '#EEF0F4'
+        tc = '#9ca3af' if dash else '#2D3142'
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (x + cell_pad, y + cell_pad), w - 2*cell_pad, h - 2*cell_pad,
+            boxstyle="round,pad=0.04", facecolor=bg,
+            edgecolor='#1a1a2e', linewidth=1.5, zorder=3))
+        ax.text(x + w/2, y + h/2, text,
+                ha='center', va='center', fontsize=13, fontweight='bold' if bold else 'normal',
+                color=tc, family='monospace', zorder=4)
+
+    def fmt_val(v):
+        if v == 0: return '-'
+        return f"{v:,.0f}".replace(',', '.')
+
+    def fmt_pct(real, meta):
+        if meta == 0 or real == 0: return '-'
+        return f"{real/meta*100:.0f}%"
+
+    # Section headers
+    y_top = fig_h - 0.30
+    orig_mid = orig_start + orig_w / 2
+    contr_mid = contr_start + contr_w / 2
+    ax.text(orig_mid, y_top, 'ORIGINAÇÃO', ha='center', va='center',
+            fontsize=14, fontweight='bold', color='#1a1a2e', zorder=3)
+    ax.text(contr_mid, y_top, 'NOVOS CONTRATOS', ha='center', va='center',
+            fontsize=14, fontweight='bold', color='#1a1a2e', zorder=3)
+
+    # Column sub-headers
+    y_sub = y_top - 0.35
+    cw_o = (orig_w - 2*cell_gap) / 3
+    cw_c = (contr_w - 2*cell_gap) / 3
+    for i, txt in enumerate(['Meta', 'Realizado', '']):
+        ax.text(orig_start + i*(cw_o+cell_gap) + cw_o/2, y_sub, txt,
+                ha='center', va='center', fontsize=11, fontweight='bold', color='#6b7280', zorder=3)
+        ax.text(contr_start + i*(cw_c+cell_gap) + cw_c/2, y_sub, txt,
+                ha='center', va='center', fontsize=11, fontweight='bold', color='#6b7280', zorder=3)
+
+    # Data rows
+    y_start = y_sub - 0.35
+    row_data = []
+
+    # 4 canais
+    for canal in canais:
+        res = resultados.get(canal, {'valor': 0, 'contratos': 0})
+        meta_v = metas_orig.get(canal, 0)
+        meta_c = metas_contr.get(canal, 0)
+        row_data.append((labels_map[canal], meta_v, res['valor'], meta_c, res['contratos'], False))
+
+    # Varejo (com separador antes)
+    row_data.append(('SEP', 0, 0, 0, 0, False))
+    row_data.append(('Varejo', varejo_meta_val, varejo_val, varejo_meta_contr, varejo_contr, True))
+
+    # Compra de carteira
+    row_data.append(('Compra de\ncarteira', carteira_meta, carteira_val, 0, 0, False))
+
+    # Total (com separador antes)
+    row_data.append(('SEP', 0, 0, 0, 0, False))
+    row_data.append(('TOTAL', total_meta_val, total_val, 0, 0, True))
+
+    y = y_start
+    for label, meta_v, real_v, meta_c, real_c, bold in row_data:
+        if label == 'SEP':
+            ax.axhline(y + row_h * 0.3, xmin=0.01, xmax=0.99,
+                       color='#1a1a2e', linewidth=1.2, zorder=2)
+            y -= row_gap
+            continue
+
+        # Label
+        ax.text(label_w - 0.05, y - row_h/2, label,
+                ha='right', va='center', fontsize=12,
+                fontweight='bold' if bold else 'normal',
+                color='#1a1a2e', zorder=3, linespacing=1.3)
+
+        # Originação cells
+        cy = y - row_h
+        draw_cell(orig_start, cy, cw_o, row_h, fmt_val(meta_v), bold=bold)
+        draw_cell(orig_start + cw_o + cell_gap, cy, cw_o, row_h,
+                  fmt_val(real_v) if real_v > 0 else '-', bold=bold, dash=(real_v == 0))
+        draw_cell(orig_start + 2*(cw_o + cell_gap), cy, cw_o, row_h,
+                  fmt_pct(real_v, meta_v) if real_v > 0 and meta_v > 0 else '-', bold=bold, dash=(real_v == 0))
+
+        # Novos Contratos cells (hide for carteira and total)
+        show_contr = label not in ('Compra de\ncarteira', 'TOTAL')
+        if show_contr:
+            draw_cell(contr_start, cy, cw_c, row_h, fmt_val(meta_c), bold=bold)
+            draw_cell(contr_start + cw_c + cell_gap, cy, cw_c, row_h,
+                      fmt_val(real_c) if real_c > 0 else '-', bold=bold, dash=(real_c == 0))
+            draw_cell(contr_start + 2*(cw_c + cell_gap), cy, cw_c, row_h,
+                      fmt_pct(real_c, meta_c) if real_c > 0 and meta_c > 0 else '-', bold=bold, dash=(real_c == 0))
+
+        y -= (row_h + row_gap)
+
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+    buf.seek(0)
+    return buf.read()
+
 
 # ══════════════════════════════════════════════════════════════
 # PROCESSAMENTO PRINCIPAL
@@ -1191,7 +1368,7 @@ def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
                    plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
                    dist_mtd_user=None, semana_atual=3, taxas_bytes=None, metas_taxa=None,
-                   contratos_bytes=None, metas_ticket=None):
+                   contratos_bytes=None, metas_ticket=None, metas_orig=None, metas_contr=None):
     """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
     # Atualiza DIST_MTD com valores do usuário
     if dist_mtd_user:
@@ -1323,6 +1500,34 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             advance(2)
     else:
         log("\n⚠️ Sem base do dashboard — pulando dashboards")
+
+    # ── Slide de Originação + Novos Contratos (slide 5) ──
+    if taxas_bytes and contratos_bytes:
+        advance(2, "📊 Gerando slide de originação...")
+        log("\n📊 Gerando slide de Originação + Novos Contratos...")
+        try:
+            resultados_orig = processar_originacao(taxas_bytes, contratos_bytes)
+            _metas_o = metas_orig or METAS_ORIG_DEFAULT
+            _metas_c = metas_contr or METAS_CONTR_DEFAULT
+            png_orig = gerar_originacao_png(resultados_orig, _metas_o, _metas_c)
+
+            slide_orig_idx = 4  # slide 5
+            if slide_orig_idx < len(prs.slides):
+                slide = prs.slides[slide_orig_idx]
+                remover_funis_existentes(slide)
+                add_img(slide, png_orig, (0.20, 0.90, 9.60, 4.50))
+                log(f"  Slide 5 — Originação + Novos Contratos ✅")
+            else:
+                log(f"  ⚠️ Slide 5 não existe")
+
+            for canal in TAXA_CANAIS_ORDEM:
+                res = resultados_orig.get(canal, {})
+                log(f"     {canal:20s} | Valor: R${res.get('valor',0):,.0f} | Contratos: {res.get('contratos',0)}")
+        except Exception as e:
+            log(f"  ❌ Erro ao processar originação: {str(e)}")
+    else:
+        if not taxas_bytes or not contratos_bytes:
+            log("\n⚠️ Sem base de taxas ou contratos — pulando slide de Originação")
 
     # ── Slide de Taxa de Juros ──
     if taxas_bytes:
@@ -1622,7 +1827,37 @@ def main():
             with tk5:
                 metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=270518, step=1000, key="meta_tk_geral")
 
+    # ── Metas de Originação ──
+    metas_orig = dict(METAS_ORIG_DEFAULT)
+    metas_contr = dict(METAS_CONTR_DEFAULT)
+    if f_contratos and f_taxas:
+        with st.expander("📊 Metas de Originação + Novos Contratos"):
+            st.caption("Metas de valor originado (R$)")
+            ov1, ov2, ov3, ov4, ov5 = st.columns(5)
+            with ov1:
+                metas_orig['B2C'] = st.number_input("B2C (R$)", min_value=0, value=10350000, step=100000, key="meta_ov_b2c")
+            with ov2:
+                metas_orig['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=18200000, step=100000, key="meta_ov_corresp")
+            with ov3:
+                metas_orig['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=18150000, step=100000, key="meta_ov_parc")
+            with ov4:
+                metas_orig['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=5400000, step=100000, key="meta_ov_rel")
+            with ov5:
+                metas_orig['Compra de carteira'] = st.number_input("Carteira (R$)", min_value=0, value=3000000, step=100000, key="meta_ov_cart")
+
+            st.caption("Metas de novos contratos (quantidade)")
+            oc1, oc2, oc3, oc4 = st.columns(4)
+            with oc1:
+                metas_contr['B2C'] = st.number_input("B2C (qtd)", min_value=0, value=46, step=1, key="meta_oc_b2c")
+            with oc2:
+                metas_contr['Correspondente'] = st.number_input("Corresp. (qtd)", min_value=0, value=38, step=1, key="meta_oc_corresp")
+            with oc3:
+                metas_contr['Parceiro'] = st.number_input("Parceiro (qtd)", min_value=0, value=78, step=1, key="meta_oc_parc")
+            with oc4:
+                metas_contr['Relacionamento'] = st.number_input("Relac. (qtd)", min_value=0, value=32, step=1, key="meta_oc_rel")
+
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
+    can_generate = f_opps is not None and f_pptx is not None
 
     # ── Step 3: Gerar ──
     can_generate = f_opps is not None and f_pptx is not None
@@ -1680,6 +1915,8 @@ def main():
                 metas_taxa=metas_taxa,
                 contratos_bytes=contratos_bytes_read,
                 metas_ticket=metas_ticket,
+                metas_orig=metas_orig,
+                metas_contr=metas_contr,
             )
 
             # Success
