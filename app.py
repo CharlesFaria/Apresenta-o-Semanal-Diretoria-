@@ -1515,7 +1515,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             if slide_orig_idx < len(prs.slides):
                 slide = prs.slides[slide_orig_idx]
                 remover_funis_existentes(slide)
-                add_img(slide, png_orig, (0.10, 1.30, 9.80, 4.10))
+                add_img(slide, png_orig, (0.20, 1.02, 9.35, 4.38))
                 log(f"  Slide 5 — Originação + Novos Contratos ✅")
             else:
                 log(f"  ⚠️ Slide 5 não existe")
@@ -1544,7 +1544,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             if slide_taxa_idx < len(prs.slides):
                 slide = prs.slides[slide_taxa_idx]
                 remover_funis_existentes(slide)
-                add_img(slide, png_taxa, (0.80, 1.40, 8.40, 4.00))
+                add_img(slide, png_taxa, (0.63, 1.32, 7.73, 4.19))
                 log(f"  Slide 7 — Taxa de Juros ✅")
             else:
                 log(f"  ⚠️ Slide 7 não existe")
@@ -1574,7 +1574,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             if slide_ticket_idx < len(prs.slides):
                 slide = prs.slides[slide_ticket_idx]
                 remover_funis_existentes(slide)
-                add_img(slide, png_ticket, (0.80, 1.40, 8.40, 4.00))
+                add_img(slide, png_ticket, (0.63, 1.32, 7.73, 4.19))
                 log(f"  Slide 8 — Ticket Médio ✅")
             else:
                 log(f"  ⚠️ Slide 8 não existe")
