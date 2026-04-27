@@ -6,7 +6,7 @@ Deploy: Streamlit Cloud (https://streamlit.io/cloud)
 """
 
 import streamlit as st
-import os, io, calendar, tempfile
+import os, io, calendar, tempfile, json, base64
 from collections import defaultdict
 from datetime import datetime, date, timedelta
 import pandas as pd
@@ -18,6 +18,7 @@ import matplotlib.patches as mpatches
 import openpyxl
 from pptx import Presentation
 from pptx.util import Inches
+import requests
 
 # ══════════════════════════════════════════════════════════════
 # PAGE CONFIG & CSS
@@ -1362,6 +1363,174 @@ def gerar_originacao_png(resultados, metas_orig, metas_contr):
 
 
 # ══════════════════════════════════════════════════════════════
+# SNAPSHOT — SALVAR E CARREGAR RETRATOS HISTÓRICOS NO GITHUB
+# ══════════════════════════════════════════════════════════════
+
+GITHUB_REPO = "CharlesFaria/Apresenta-o-Semanal-Diretoria-"
+SNAPSHOTS_DIR = "snapshots"
+
+
+def _get_github_token():
+    """Obtém o token do GitHub dos secrets do Streamlit."""
+    try:
+        return st.secrets.get("GITHUB_TOKEN", None)
+    except Exception:
+        return None
+
+
+def _github_headers():
+    token = _get_github_token()
+    if not token:
+        return None
+    return {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+
+def salvar_snapshot_github(data_ref, snapshot_data):
+    """
+    Salva um snapshot no GitHub como JSON.
+    Arquivo: snapshots/2026-04-25.json
+    """
+    headers = _github_headers()
+    if not headers:
+        return False, "Token GitHub não configurado"
+
+    filename = f"{SNAPSHOTS_DIR}/{data_ref.strftime('%Y-%m-%d')}.json"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+
+    content_b64 = base64.b64encode(json.dumps(snapshot_data, ensure_ascii=False, default=str).encode()).decode()
+
+    # Verificar se já existe (precisa do SHA para atualizar)
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            sha = resp.json().get("sha")
+            body = {
+                "message": f"Atualizar snapshot {data_ref.strftime('%d/%m/%Y')}",
+                "content": content_b64,
+                "sha": sha,
+            }
+        else:
+            body = {
+                "message": f"Snapshot {data_ref.strftime('%d/%m/%Y')}",
+                "content": content_b64,
+            }
+
+        resp = requests.put(url, headers=headers, json=body, timeout=15)
+        if resp.status_code in (200, 201):
+            return True, f"Snapshot salvo: {filename}"
+        else:
+            return False, f"Erro ao salvar: {resp.status_code} - {resp.text[:200]}"
+    except Exception as e:
+        return False, f"Erro: {str(e)}"
+
+
+def listar_snapshots_github():
+    """Lista todos os snapshots disponíveis no GitHub."""
+    headers = _github_headers()
+    if not headers:
+        return []
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{SNAPSHOTS_DIR}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return []
+        files = resp.json()
+        datas = []
+        for f in files:
+            nome = f.get("name", "")
+            if nome.endswith(".json"):
+                try:
+                    d = datetime.strptime(nome.replace(".json", ""), "%Y-%m-%d").date()
+                    datas.append(d)
+                except ValueError:
+                    pass
+        return sorted(datas)
+    except Exception:
+        return []
+
+
+def carregar_snapshot_github(data_ref):
+    """Carrega um snapshot específico do GitHub."""
+    headers = _github_headers()
+    if not headers:
+        return None
+
+    filename = f"{SNAPSHOTS_DIR}/{data_ref.strftime('%Y-%m-%d')}.json"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return None
+        content_b64 = resp.json().get("content", "")
+        content = base64.b64decode(content_b64).decode()
+        return json.loads(content)
+    except Exception:
+        return None
+
+
+def buscar_snapshot_mais_proximo(data_alvo, tolerancia_dias=7):
+    """
+    Busca o snapshot com data mais próxima da data_alvo.
+    Retorna (data_snapshot, dados) ou (None, None) se não encontrar.
+    """
+    datas = listar_snapshots_github()
+    if not datas:
+        return None, None
+
+    # Encontrar o mais próximo
+    melhor = None
+    menor_diff = timedelta(days=999)
+    for d in datas:
+        diff = abs(d - data_alvo)
+        if diff < menor_diff and diff <= timedelta(days=tolerancia_dias):
+            menor_diff = diff
+            melhor = d
+
+    if melhor is None:
+        return None, None
+
+    dados = carregar_snapshot_github(melhor)
+    return melhor, dados
+
+
+def montar_snapshot(data_ref, cache_funis, fases_ativas, resultados_taxa=None,
+                     resultados_ticket=None, resultados_orig=None):
+    """
+    Monta o dict do snapshot com todos os dados da apresentação.
+    cache_funis: dict de (canal, tipo, "atual") → bytes PNG (base64 encoded)
+    """
+    snapshot = {
+        "data": data_ref.isoformat(),
+        "gerado_em": datetime.now().isoformat(),
+        "funis": {},
+        "taxa": resultados_taxa,
+        "ticket": resultados_ticket,
+        "originacao": resultados_orig,
+    }
+
+    # Salvar funis como base64
+    for (canal, tipo, periodo), png_bytes in cache_funis.items():
+        if periodo == "atual":
+            key = f"{canal}_{tipo}"
+            snapshot["funis"][key] = base64.b64encode(png_bytes).decode()
+
+    return snapshot
+
+
+def extrair_funil_do_snapshot(snapshot, canal, tipo):
+    """Extrai bytes PNG de um funil do snapshot."""
+    key = f"{canal}_{tipo}"
+    b64 = snapshot.get("funis", {}).get(key)
+    if b64:
+        return base64.b64decode(b64)
+    return None
+
+
+# ══════════════════════════════════════════════════════════════
 # PROCESSAMENTO PRINCIPAL
 # ══════════════════════════════════════════════════════════════
 
@@ -1411,6 +1580,18 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     rows = carregar_base(base_funil_bytes)
     log(f"\n📊 Base do funil: {len(rows)} oportunidades")
 
+    # ── Buscar snapshot do mês anterior ──
+    snapshot_mes_ant = None
+    snapshot_data_real = None
+    advance(1, "🔍 Buscando snapshot do mês anterior...")
+    snap_date, snap_data = buscar_snapshot_mais_proximo(data_mes_ant, tolerancia_dias=7)
+    if snap_data:
+        snapshot_mes_ant = snap_data
+        snapshot_data_real = snap_date
+        log(f"\n📸 Snapshot encontrado: {snap_date.strftime('%d/%m/%Y')} (pedido: {data_mes_ant.strftime('%d/%m/%Y')})")
+    else:
+        log(f"\n📸 Nenhum snapshot próximo de {data_mes_ant.strftime('%d/%m/%Y')} — calculando da base")
+
     # Gerar funis
     advance(2, "🎨 Gerando funis...")
     log("\n🎨 Gerando funis...")
@@ -1421,6 +1602,13 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     fases_ativas = {}
     for canal, tipo in combos:
         for chave, data_ref in periodos:
+            # Se é mes_ant E temos snapshot, usar a imagem salva
+            if chave == "mes_ant" and snapshot_mes_ant:
+                funil_salvo = extrair_funil_do_snapshot(snapshot_mes_ant, canal, tipo)
+                if funil_salvo:
+                    cache[(canal, tipo, chave)] = funil_salvo
+                    continue
+            # Caso contrário, calcular normalmente
             count, volume = retrato_funil(rows, canal, data_ref)
             mes = MESES_PT[data_ref.month]
             data_label = f"{mes} ({data_ref.strftime('%d/%m')})"
@@ -1591,6 +1779,47 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     # Salvar
     advance(2, "💾 Salvando apresentação...")
     output = io.BytesIO(); prs.save(output); output.seek(0)
+
+    # ── Salvar snapshot automaticamente ──
+    advance(1, "📸 Salvando snapshot...")
+    try:
+        # Coletar resultados para o snapshot
+        snap_taxas = None
+        snap_ticket = None
+        snap_orig = None
+        try:
+            if taxas_bytes:
+                snap_taxas = processar_taxas(taxas_bytes)
+                # Converter valores float para serializable
+                snap_taxas = {k: {kk: float(vv) for kk, vv in v.items()} for k, v in snap_taxas.items()}
+        except: pass
+        try:
+            if taxas_bytes and contratos_bytes:
+                snap_ticket = processar_ticket_medio(taxas_bytes, contratos_bytes)
+                snap_ticket = {k: float(v) for k, v in snap_ticket.items()}
+        except: pass
+        try:
+            if taxas_bytes and contratos_bytes:
+                snap_orig = processar_originacao(taxas_bytes, contratos_bytes)
+                snap_orig = {k: {kk: float(vv) for kk, vv in v.items()} for k, v in snap_orig.items()}
+        except: pass
+
+        snapshot = montar_snapshot(
+            data_ref=data_atual,
+            cache_funis=cache,
+            fases_ativas=fases_ativas,
+            resultados_taxa=snap_taxas,
+            resultados_ticket=snap_ticket,
+            resultados_orig=snap_orig,
+        )
+        ok, msg = salvar_snapshot_github(data_atual, snapshot)
+        if ok:
+            log(f"\n📸 {msg}")
+        else:
+            log(f"\n⚠️ Snapshot não salvo: {msg}")
+    except Exception as e:
+        log(f"\n⚠️ Erro ao salvar snapshot: {str(e)}")
+
     log("\n✅ Apresentação gerada com sucesso!")
     log("🎉 Pronto! Baixe o arquivo abaixo.")
     progress_bar.progress(1.0)
@@ -1857,7 +2086,30 @@ def main():
                 metas_contr['Relacionamento'] = st.number_input("Relac. (qtd)", min_value=0, value=32, step=1, key="meta_oc_rel")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
-    can_generate = f_opps is not None and f_pptx is not None
+
+    # ── Snapshots ──
+    with st.expander("📸 Snapshots históricos (automático)"):
+        token_ok = _get_github_token() is not None
+        if token_ok:
+            st.markdown("✅ **GitHub Token configurado** — snapshots serão salvos automaticamente")
+            datas_snap = listar_snapshots_github()
+            if datas_snap:
+                st.caption(f"{len(datas_snap)} snapshot(s) salvos:")
+                for d in datas_snap[-10:]:  # últimos 10
+                    st.markdown(f"  · `{d.strftime('%d/%m/%Y')}`")
+            else:
+                st.caption("Nenhum snapshot salvo ainda. O primeiro será criado ao gerar a apresentação.")
+        else:
+            st.markdown("⚠️ **GitHub Token não configurado** — snapshots não serão salvos")
+            st.markdown("""
+            Para ativar os snapshots automáticos:
+            1. No GitHub, vá em **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+            2. Gere um token com permissão **repo**
+            3. No Streamlit Cloud, vá em **Manage app** → **Settings** → **Secrets**
+            4. Adicione: `GITHUB_TOKEN = "seu_token_aqui"`
+            """)
+
+    st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
     # ── Step 3: Gerar ──
     can_generate = f_opps is not None and f_pptx is not None
