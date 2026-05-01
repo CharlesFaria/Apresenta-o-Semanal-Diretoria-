@@ -729,7 +729,12 @@ def count_leads_df(df_leads, canal, start, end):
     mask = (df_c['Data de criação'] >= start) & (df_c['Data de criação'] <= end)
     df_p = df_c[mask]; total = len(df_p)
     wl_col = next((c for c in df_c.columns if 'workable' in c.lower()), None)
-    workable = int(df_p[wl_col].apply(lambda v: str(v).strip().upper() in ('1','TRUE','VERDADEIRO')).sum()) if wl_col else 0
+    workable = 0
+    if wl_col and len(df_p) > 0:
+        try:
+            workable = int(df_p[wl_col].apply(lambda v: 1 if str(v).strip().upper() in ('1','TRUE','VERDADEIRO') else 0).sum())
+        except (ValueError, TypeError):
+            workable = 0
     return {'Lead': total, 'Workable Lead': workable}
 
 
