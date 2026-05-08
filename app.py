@@ -1222,15 +1222,15 @@ def processar_originacao(taxas_bytes, contratos_bytes):
 
 
 def gerar_originacao_png(resultados, metas_orig, metas_contr):
-    """Gera imagem PNG da tabela de Originação + Novos Contratos (fundo branco, sem cores no %)."""
+    """Gera imagem PNG da tabela de Originação + Novos Contratos — design premium para diretoria."""
     labels_map = {
         'B2C': 'B2C', 'Correspondente': 'Parceiros\nCorrespondentes',
         'Parceiro': 'Grandes\nParcerias', 'Relacionamento': 'Relacionamento',
     }
 
-    canais = TAXA_CANAIS_ORDEM  # B2C, Correspondente, Parceiro, Relacionamento
+    canais = TAXA_CANAIS_ORDEM
 
-    # Calcular totais Varejo
+    # Calcular totais
     varejo_val = sum(resultados.get(c, {}).get('valor', 0) for c in canais)
     varejo_contr = sum(resultados.get(c, {}).get('contratos', 0) for c in canais)
     varejo_meta_val = sum(metas_orig.get(c, 0) for c in canais)
@@ -1243,39 +1243,33 @@ def gerar_originacao_png(resultados, metas_orig, metas_contr):
     total_val = varejo_val + carteira_val
     total_meta_val = varejo_meta_val + carteira_meta
 
-    # Dimensões
-    n_rows = 7  # 4 canais + varejo + carteira + total
-    fig_w = 9.6
-    row_h = 0.66
-    row_gap = 0.10
-    header_h = 0.90  # espaço para headers duplos
-    fig_h = header_h + n_rows * (row_h + row_gap) + 0.40  # extra para separadores
+    # Layout
+    fig_w = 10.0
+    row_h = 0.58
+    row_gap = 0.08
+    sep_h = 0.18
+    n_data_rows = 7  # 4 canais + varejo + carteira + total
+    n_seps = 2
+    header_h = 0.80
+    fig_h = header_h + n_data_rows * (row_h + row_gap) + n_seps * sep_h + 0.20
 
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     fig.patch.set_facecolor('white')
-    ax.set_xlim(0, fig_w); ax.set_ylim(0, fig_h); ax.axis('off')
+    ax.set_xlim(0, fig_w)
+    ax.set_ylim(0, fig_h)
+    ax.axis('off')
 
-    # Layout: label | orig(meta, real, %) | contr(meta, real, %)
-    label_w = 1.40
-    gap_sections = 0.25
-    orig_w = (fig_w - label_w - gap_sections - 0.30) * 0.6
-    contr_w = (fig_w - label_w - gap_sections - 0.30) * 0.4
-    orig_start = label_w + 0.15
-    contr_start = orig_start + orig_w + gap_sections
+    # Column layout
+    label_w = 1.35
+    section_gap = 0.30
+    orig_total_w = 4.95
+    contr_total_w = 3.30
+    orig_x = label_w + 0.10
+    contr_x = orig_x + orig_total_w + section_gap
 
-    cell_gap = 0.08
-    cell_pad = 0.04
-
-    def draw_cell(x, y, w, h, text, bold=False, dash=False):
-        bg = '#EEF0F4'
-        tc = '#9ca3af' if dash else '#2D3142'
-        ax.add_patch(mpatches.FancyBboxPatch(
-            (x + cell_pad, y + cell_pad), w - 2*cell_pad, h - 2*cell_pad,
-            boxstyle="round,pad=0.04", facecolor=bg,
-            edgecolor='#1a1a2e', linewidth=1.5, zorder=3))
-        ax.text(x + w/2, y + h/2, text,
-                ha='center', va='center', fontsize=13, fontweight='bold' if bold else 'normal',
-                color=tc, family='monospace', zorder=4)
+    # Proportions within each section: meta | realizado | %
+    orig_props = [0.38, 0.38, 0.24]
+    contr_props = [0.30, 0.30, 0.40]
 
     def fmt_val(v):
         if v == 0: return '-'
@@ -1285,77 +1279,96 @@ def gerar_originacao_png(resultados, metas_orig, metas_contr):
         if meta == 0 or real == 0: return '-'
         return f"{real/meta*100:.0f}%"
 
-    # Section headers
-    y_top = fig_h - 0.30
-    orig_mid = orig_start + orig_w / 2
-    contr_mid = contr_start + contr_w / 2
-    ax.text(orig_mid, y_top, 'ORIGINAÇÃO', ha='center', va='center',
-            fontsize=14, fontweight='bold', color='#1a1a2e', zorder=3)
-    ax.text(contr_mid, y_top, 'NOVOS CONTRATOS', ha='center', va='center',
-            fontsize=14, fontweight='bold', color='#1a1a2e', zorder=3)
+    def draw_bar(x, y, total_w, h, values, props, bold=False, highlight=False, hide=False):
+        """Desenha uma barra conectada (Meta + Realizado + %) com bordas compartilhadas."""
+        if hide:
+            return
+        bg = '#e8ecf2' if highlight else '#f1f5f9'
+        ec = '#d0d5dd'
+        fs = 15 if not bold else 16
+        fw = 'bold' if bold else 'normal'
 
-    # Column sub-headers
-    y_sub = y_top - 0.35
-    cw_o = (orig_w - 2*cell_gap) / 3
-    cw_c = (contr_w - 2*cell_gap) / 3
+        # Barra principal (retângulo com borda arredondada)
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (x, y), total_w, h,
+            boxstyle="round,pad=0.03",
+            facecolor=bg, edgecolor=ec, linewidth=1.0, zorder=3))
+
+        # Divisórias verticais internas
+        cx = x
+        for i, (val, prop) in enumerate(zip(values, props)):
+            cell_w = total_w * prop
+            # Divisória (exceto antes da primeira)
+            if i > 0:
+                ax.plot([cx, cx], [y + 0.04, y + h - 0.04],
+                        color=ec, linewidth=0.8, zorder=4)
+
+            # Texto
+            tc = '#0f172a' if val != '-' else '#cbd5e1'
+            ax.text(cx + cell_w / 2, y + h / 2, str(val),
+                    ha='center', va='center', fontsize=fs, fontweight=fw,
+                    color=tc, zorder=5)
+            cx += cell_w
+
+    # Section headers
+    y = fig_h - 0.25
+    ax.text(orig_x + orig_total_w / 2, y, 'ORIGINAÇÃO',
+            ha='center', va='center', fontsize=15, fontweight='bold',
+            color='#0f172a', zorder=3)
+    ax.text(contr_x + contr_total_w / 2, y, 'NOVOS CONTRATOS',
+            ha='center', va='center', fontsize=15, fontweight='bold',
+            color='#0f172a', zorder=3)
+
+    # Sub-headers
+    y -= 0.35
     for i, txt in enumerate(['Meta', 'Realizado', '']):
-        ax.text(orig_start + i*(cw_o+cell_gap) + cw_o/2, y_sub, txt,
-                ha='center', va='center', fontsize=11, fontweight='bold', color='#6b7280', zorder=3)
-        ax.text(contr_start + i*(cw_c+cell_gap) + cw_c/2, y_sub, txt,
-                ha='center', va='center', fontsize=11, fontweight='bold', color='#6b7280', zorder=3)
+        ox = orig_x + sum(orig_props[:i]) * orig_total_w + orig_props[i] * orig_total_w / 2
+        ax.text(ox, y, txt, ha='center', va='center',
+                fontsize=9.5, fontweight='bold', color='#94a3b8', zorder=3)
+        cx_ = contr_x + sum(contr_props[:i]) * contr_total_w + contr_props[i] * contr_total_w / 2
+        ax.text(cx_, y, txt, ha='center', va='center',
+                fontsize=9.5, fontweight='bold', color='#94a3b8', zorder=3)
 
     # Data rows
-    y_start = y_sub - 0.35
+    y -= 0.25
     row_data = []
-
-    # 4 canais
     for canal in canais:
         res = resultados.get(canal, {'valor': 0, 'contratos': 0})
         meta_v = metas_orig.get(canal, 0)
         meta_c = metas_contr.get(canal, 0)
-        row_data.append((labels_map[canal], meta_v, res['valor'], meta_c, res['contratos'], False))
+        row_data.append((labels_map[canal], meta_v, res['valor'], meta_c, res['contratos'], False, False, True))
 
-    # Varejo (com separador antes)
-    row_data.append(('SEP', 0, 0, 0, 0, False))
-    row_data.append(('Varejo', varejo_meta_val, varejo_val, varejo_meta_contr, varejo_contr, True))
+    row_data.append(('SEP', 0, 0, 0, 0, False, False, False))
+    row_data.append(('Varejo', varejo_meta_val, varejo_val, varejo_meta_contr, varejo_contr, True, True, True))
+    row_data.append(('Compra de\ncarteira', carteira_meta, carteira_val, 0, 0, False, False, False))
+    row_data.append(('SEP', 0, 0, 0, 0, False, False, False))
+    row_data.append(('TOTAL', total_meta_val, total_val, 0, 0, True, True, False))
 
-    # Compra de carteira
-    row_data.append(('Compra de\ncarteira', carteira_meta, carteira_val, 0, 0, False))
-
-    # Total (com separador antes)
-    row_data.append(('SEP', 0, 0, 0, 0, False))
-    row_data.append(('TOTAL', total_meta_val, total_val, 0, 0, True))
-
-    y = y_start
-    for label, meta_v, real_v, meta_c, real_c, bold in row_data:
+    for label, meta_v, real_v, meta_c, real_c, bold, highlight, show_contr in row_data:
         if label == 'SEP':
-            ax.axhline(y + row_h * 0.3, xmin=0.01, xmax=0.99,
-                       color='#1a1a2e', linewidth=1.2, zorder=2)
-            y -= row_gap
+            ax.axhline(y, xmin=0.01, xmax=0.99, color='#0f172a', linewidth=1.8, zorder=2)
+            y -= sep_h
             continue
 
         # Label
-        ax.text(label_w - 0.05, y - row_h/2, label,
-                ha='right', va='center', fontsize=12,
+        ax.text(label_w - 0.05, y - row_h / 2, label,
+                ha='right', va='center', fontsize=11.5,
                 fontweight='bold' if bold else 'normal',
-                color='#1a1a2e', zorder=3, linespacing=1.3)
+                color='#0f172a', zorder=3, linespacing=1.2)
 
-        # Originação cells
-        cy = y - row_h
-        draw_cell(orig_start, cy, cw_o, row_h, fmt_val(meta_v), bold=bold)
-        draw_cell(orig_start + cw_o + cell_gap, cy, cw_o, row_h,
-                  fmt_val(real_v) if real_v > 0 else '-', bold=bold, dash=(real_v == 0))
-        draw_cell(orig_start + 2*(cw_o + cell_gap), cy, cw_o, row_h,
-                  fmt_pct(real_v, meta_v) if real_v > 0 and meta_v > 0 else '-', bold=bold, dash=(real_v == 0))
+        # Originação bar
+        ry = y - row_h
+        pct_v = fmt_pct(real_v, meta_v)
+        draw_bar(orig_x, ry, orig_total_w, row_h,
+                 [fmt_val(meta_v), fmt_val(real_v) if real_v > 0 else '-', pct_v],
+                 orig_props, bold=bold, highlight=highlight)
 
-        # Novos Contratos cells (hide for carteira and total)
-        show_contr = label not in ('Compra de\ncarteira', 'TOTAL')
+        # Novos Contratos bar
         if show_contr:
-            draw_cell(contr_start, cy, cw_c, row_h, fmt_val(meta_c), bold=bold)
-            draw_cell(contr_start + cw_c + cell_gap, cy, cw_c, row_h,
-                      fmt_val(real_c) if real_c > 0 else '-', bold=bold, dash=(real_c == 0))
-            draw_cell(contr_start + 2*(cw_c + cell_gap), cy, cw_c, row_h,
-                      fmt_pct(real_c, meta_c) if real_c > 0 and meta_c > 0 else '-', bold=bold, dash=(real_c == 0))
+            pct_c = fmt_pct(real_c, meta_c)
+            draw_bar(contr_x, ry, contr_total_w, row_h,
+                     [fmt_val(meta_c), fmt_val(real_c) if real_c > 0 else '-', pct_c],
+                     contr_props, bold=bold, highlight=highlight)
 
         y -= (row_h + row_gap)
 
