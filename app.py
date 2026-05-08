@@ -2060,25 +2060,40 @@ def main():
             with mt5:
                 metas_taxa['Geral'] = st.number_input("Geral (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_geral") / 100
 
-    # ── Metas de Ticket Médio ──
-    metas_ticket = {
-        'B2C': 220882, 'Correspondente': 471614, 'Parceiro': 226959,
-        'Relacionamento': 162619, 'Geral': 270518,
+    # ── Metas de Ticket Médio (por mês) ──
+    METAS_TICKET_MENSAL = {
+        #        B2C      Correspondente(PC)  Parceiro(GP)  Relacionamento  Geral
+        1:  {'B2C': 216216, 'Correspondente': 466667, 'Parceiro': 223684, 'Relacionamento': 161111, 'Geral': 253846},
+        2:  {'B2C': 204545, 'Correspondente': 471429, 'Parceiro': 223684, 'Relacionamento': 181818, 'Geral': 257979},
+        3:  {'B2C': 225000, 'Correspondente': 476190, 'Parceiro': 230233, 'Relacionamento': 162971, 'Geral': 263014},
+        4:  {'B2C': 230000, 'Correspondente': 480556, 'Parceiro': 233708, 'Relacionamento': 165517, 'Geral': 268557},
+        5:  {'B2C': 234146, 'Correspondente': 483784, 'Parceiro': 238202, 'Relacionamento': 165517, 'Geral': 272959},
+        6:  {'B2C': 237209, 'Correspondente': 487179, 'Parceiro': 242553, 'Relacionamento': 167742, 'Geral': 276329},
+        7:  {'B2C': 240816, 'Correspondente': 490909, 'Parceiro': 246602, 'Relacionamento': 167742, 'Geral': 279741},
+        8:  {'B2C': 245652, 'Correspondente': 495349, 'Parceiro': 251020, 'Relacionamento': 169444, 'Geral': 285068},
+        9:  {'B2C': 250000, 'Correspondente': 500000, 'Parceiro': 255319, 'Relacionamento': 170588, 'Geral': 288208},
+        10: {'B2C': 254348, 'Correspondente': 504651, 'Parceiro': 260396, 'Relacionamento': 169697, 'Geral': 292857},
+        11: {'B2C': 259091, 'Correspondente': 507317, 'Parceiro': 264363, 'Relacionamento': 173529, 'Geral': 297170},
+        12: {'B2C': 263830, 'Correspondente': 511364, 'Parceiro': 269608, 'Relacionamento': 175758, 'Geral': 301770},
     }
+    mes_ref = data_atual.month if usar_auto else data_atual.month
+    metas_ticket_default = METAS_TICKET_MENSAL.get(mes_ref, METAS_TICKET_MENSAL[4])
+    metas_ticket = dict(metas_ticket_default)
+
     if f_contratos and f_taxas:
         with st.expander("📋 Metas de Ticket Médio"):
-            st.caption("Ajuste as metas de ticket médio por canal (valor em R$)")
+            st.caption(f"Metas para {MESES_PT[mes_ref]} (carregadas automaticamente — ajuste se necessário)")
             tk1, tk2, tk3, tk4, tk5 = st.columns(5)
             with tk1:
-                metas_ticket['B2C'] = st.number_input("B2C (R$)", min_value=0, value=220882, step=1000, key="meta_tk_b2c")
+                metas_ticket['B2C'] = st.number_input("B2C (R$)", min_value=0, value=metas_ticket_default['B2C'], step=1000, key="meta_tk_b2c")
             with tk2:
-                metas_ticket['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=471614, step=1000, key="meta_tk_corresp")
+                metas_ticket['Correspondente'] = st.number_input("PC (R$)", min_value=0, value=metas_ticket_default['Correspondente'], step=1000, key="meta_tk_corresp")
             with tk3:
-                metas_ticket['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=226959, step=1000, key="meta_tk_parc")
+                metas_ticket['Parceiro'] = st.number_input("GP (R$)", min_value=0, value=metas_ticket_default['Parceiro'], step=1000, key="meta_tk_parc")
             with tk4:
-                metas_ticket['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=162619, step=1000, key="meta_tk_rel")
+                metas_ticket['Relacionamento'] = st.number_input("Rel (R$)", min_value=0, value=metas_ticket_default['Relacionamento'], step=1000, key="meta_tk_rel")
             with tk5:
-                metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=270518, step=1000, key="meta_tk_geral")
+                metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=metas_ticket_default['Geral'], step=1000, key="meta_tk_geral")
 
     # ── Metas de Originação ──
     metas_orig = dict(METAS_ORIG_DEFAULT)
