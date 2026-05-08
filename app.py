@@ -1019,8 +1019,8 @@ def processar_taxas(file_bytes):
 
 
 def _cor_semaforo_taxa(valor, meta):
-    """Para taxas: verde se <= meta (bom), vermelho se > meta (ruim)."""
-    if valor <= meta:
+    """Para taxas: verde se >= meta (bom, banco cobra mais), vermelho se < meta (ruim)."""
+    if valor >= meta:
         return '#16A34A'
     return '#DC2626'
 
