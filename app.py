@@ -944,9 +944,14 @@ def processar_taxas(file_bytes):
     import numpy as np
     df = pd.read_excel(io.BytesIO(file_bytes))
 
-    # Passo 0: Remover Derivadas
+    # Passo 0a: Remover Derivadas
     mask_deriv = df['Nome da oportunidade'].str.contains('Derivada', case=False, na=False)
     df = df[~mask_deriv].copy()
+
+    # Passo 0b: Remover Pré-Fixados (se coluna Modalidade existir)
+    if 'Modalidade' in df.columns:
+        mask_prefixado = df['Modalidade'].str.contains('Pré-Fixado|Pre-Fixado|PRÉ-FIXADO|PRE-FIXADO', case=False, na=False)
+        df = df[~mask_prefixado].copy()
 
     # Passo 1: Extrair nome da pessoa
     df['nome_pessoa'] = df['Nome da oportunidade'].apply(
@@ -961,7 +966,8 @@ def processar_taxas(file_bytes):
         if not reneg_mask.any():
             return group
         reneg_idx = group[reneg_mask].index[0]
-        soma_valor = group['Valor do Derivado'].sum()
+        # Soma ignorando NaN
+        soma_valor = group['Valor do Derivado'].fillna(0).sum()
         result = group.copy()
         result.loc[reneg_idx, 'Valor do Derivado'] = soma_valor
         outras = result.index != reneg_idx
