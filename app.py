@@ -1555,6 +1555,55 @@ def extrair_funil_do_snapshot(snapshot, canal, tipo):
 
 
 # ══════════════════════════════════════════════════════════════
+# PERSISTÊNCIA DE METAS NO GITHUB
+# ══════════════════════════════════════════════════════════════
+
+METAS_FILE = "metas.json"
+
+
+@st.cache_data(ttl=300)  # Cache por 5 minutos
+def carregar_metas_github():
+    """Carrega metas salvas do GitHub."""
+    headers = _github_headers()
+    if not headers:
+        return {}
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{METAS_FILE}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return {}
+        content_b64 = resp.json().get("content", "")
+        content = base64.b64decode(content_b64).decode()
+        return json.loads(content)
+    except Exception:
+        return {}
+
+
+def salvar_metas_github(metas_data):
+    """Salva metas no GitHub como JSON."""
+    headers = _github_headers()
+    if not headers:
+        return False
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{METAS_FILE}"
+    content_b64 = base64.b64encode(json.dumps(metas_data, ensure_ascii=False).encode()).decode()
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            sha = resp.json().get("sha")
+            body = {"message": "Atualizar metas", "content": content_b64, "sha": sha}
+        else:
+            body = {"message": "Criar metas", "content": content_b64}
+        resp = requests.put(url, headers=headers, json=body, timeout=15)
+        if resp.status_code in (200, 201):
+            # Limpar cache para carregar os novos valores
+            carregar_metas_github.clear()
+            return True
+    except Exception:
+        pass
+    return False
+
+
+# ══════════════════════════════════════════════════════════════
 # PROCESSAMENTO PRINCIPAL
 # ══════════════════════════════════════════════════════════════
 
@@ -2070,26 +2119,29 @@ def main():
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
-    # ── Metas de Taxa (só aparece se base de taxas foi carregada) ──
+    # ── Carregar metas salvas do GitHub ──
+    metas_salvas = carregar_metas_github()
+
+    # ── Metas de Taxa ──
+    _tx_saved = metas_salvas.get('taxa', {})
     metas_taxa = dict(METAS_TAXA_DEFAULT)
     if f_taxas:
         with st.expander("💰 Metas de Taxa de Juros"):
             st.caption("Ajuste as metas de taxa por canal (formato decimal, ex: 1.38 = 1,38%)")
             mt1, mt2, mt3, mt4, mt5 = st.columns(5)
             with mt1:
-                metas_taxa['B2C'] = st.number_input("B2C (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_b2c") / 100
+                metas_taxa['B2C'] = st.number_input("B2C (%)", min_value=0.0, max_value=5.0, value=float(_tx_saved.get('B2C', 1.38)), step=0.01, format="%.2f", key="meta_b2c") / 100
             with mt2:
-                metas_taxa['Correspondente'] = st.number_input("Corresp. (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_corresp") / 100
+                metas_taxa['Correspondente'] = st.number_input("Corresp. (%)", min_value=0.0, max_value=5.0, value=float(_tx_saved.get('Correspondente', 1.40)), step=0.01, format="%.2f", key="meta_corresp") / 100
             with mt3:
-                metas_taxa['Parceiro'] = st.number_input("Parceiro (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_parc") / 100
+                metas_taxa['Parceiro'] = st.number_input("Parceiro (%)", min_value=0.0, max_value=5.0, value=float(_tx_saved.get('Parceiro', 1.40)), step=0.01, format="%.2f", key="meta_parc") / 100
             with mt4:
-                metas_taxa['Relacionamento'] = st.number_input("Relac. (%)", min_value=0.0, max_value=5.0, value=1.40, step=0.01, format="%.2f", key="meta_rel") / 100
+                metas_taxa['Relacionamento'] = st.number_input("Relac. (%)", min_value=0.0, max_value=5.0, value=float(_tx_saved.get('Relacionamento', 1.40)), step=0.01, format="%.2f", key="meta_rel") / 100
             with mt5:
-                metas_taxa['Geral'] = st.number_input("Geral (%)", min_value=0.0, max_value=5.0, value=1.38, step=0.01, format="%.2f", key="meta_geral") / 100
+                metas_taxa['Geral'] = st.number_input("Geral (%)", min_value=0.0, max_value=5.0, value=float(_tx_saved.get('Geral', 1.38)), step=0.01, format="%.2f", key="meta_geral") / 100
 
     # ── Metas de Ticket Médio (por mês) ──
     METAS_TICKET_MENSAL = {
-        #        B2C      Correspondente(PC)  Parceiro(GP)  Relacionamento  Geral
         1:  {'B2C': 216216, 'Correspondente': 466667, 'Parceiro': 223684, 'Relacionamento': 161111, 'Geral': 253846},
         2:  {'B2C': 204545, 'Correspondente': 471429, 'Parceiro': 223684, 'Relacionamento': 181818, 'Geral': 257979},
         3:  {'B2C': 225000, 'Correspondente': 476190, 'Parceiro': 230233, 'Relacionamento': 162971, 'Geral': 263014},
@@ -2105,6 +2157,7 @@ def main():
     }
     mes_ref = data_atual.month if usar_auto else data_atual.month
     metas_ticket_default = METAS_TICKET_MENSAL.get(mes_ref, METAS_TICKET_MENSAL[4])
+    _tk_saved = metas_salvas.get('ticket', {})
     metas_ticket = dict(metas_ticket_default)
 
     if f_contratos and f_taxas:
@@ -2112,17 +2165,19 @@ def main():
             st.caption(f"Metas para {MESES_PT[mes_ref]} (carregadas automaticamente — ajuste se necessário)")
             tk1, tk2, tk3, tk4, tk5 = st.columns(5)
             with tk1:
-                metas_ticket['B2C'] = st.number_input("B2C (R$)", min_value=0, value=metas_ticket_default['B2C'], step=1000, key="meta_tk_b2c")
+                metas_ticket['B2C'] = st.number_input("B2C (R$)", min_value=0, value=int(_tk_saved.get('B2C', metas_ticket_default['B2C'])), step=1000, key="meta_tk_b2c")
             with tk2:
-                metas_ticket['Correspondente'] = st.number_input("PC (R$)", min_value=0, value=metas_ticket_default['Correspondente'], step=1000, key="meta_tk_corresp")
+                metas_ticket['Correspondente'] = st.number_input("PC (R$)", min_value=0, value=int(_tk_saved.get('Correspondente', metas_ticket_default['Correspondente'])), step=1000, key="meta_tk_corresp")
             with tk3:
-                metas_ticket['Parceiro'] = st.number_input("GP (R$)", min_value=0, value=metas_ticket_default['Parceiro'], step=1000, key="meta_tk_parc")
+                metas_ticket['Parceiro'] = st.number_input("GP (R$)", min_value=0, value=int(_tk_saved.get('Parceiro', metas_ticket_default['Parceiro'])), step=1000, key="meta_tk_parc")
             with tk4:
-                metas_ticket['Relacionamento'] = st.number_input("Rel (R$)", min_value=0, value=metas_ticket_default['Relacionamento'], step=1000, key="meta_tk_rel")
+                metas_ticket['Relacionamento'] = st.number_input("Rel (R$)", min_value=0, value=int(_tk_saved.get('Relacionamento', metas_ticket_default['Relacionamento'])), step=1000, key="meta_tk_rel")
             with tk5:
-                metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=metas_ticket_default['Geral'], step=1000, key="meta_tk_geral")
+                metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=int(_tk_saved.get('Geral', metas_ticket_default['Geral'])), step=1000, key="meta_tk_geral")
 
     # ── Metas de Originação ──
+    _ov_saved = metas_salvas.get('originacao', {})
+    _oc_saved = metas_salvas.get('contratos', {})
     metas_orig = dict(METAS_ORIG_DEFAULT)
     metas_contr = dict(METAS_CONTR_DEFAULT)
     if f_contratos and f_taxas:
@@ -2130,26 +2185,40 @@ def main():
             st.caption("Metas de valor originado (R$)")
             ov1, ov2, ov3, ov4, ov5 = st.columns(5)
             with ov1:
-                metas_orig['B2C'] = st.number_input("B2C (R$)", min_value=0, value=10350000, step=100000, key="meta_ov_b2c")
+                metas_orig['B2C'] = st.number_input("B2C (R$)", min_value=0, value=int(_ov_saved.get('B2C', 10350000)), step=100000, key="meta_ov_b2c")
             with ov2:
-                metas_orig['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=18200000, step=100000, key="meta_ov_corresp")
+                metas_orig['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=int(_ov_saved.get('Correspondente', 18200000)), step=100000, key="meta_ov_corresp")
             with ov3:
-                metas_orig['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=18150000, step=100000, key="meta_ov_parc")
+                metas_orig['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=int(_ov_saved.get('Parceiro', 18150000)), step=100000, key="meta_ov_parc")
             with ov4:
-                metas_orig['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=5400000, step=100000, key="meta_ov_rel")
+                metas_orig['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=int(_ov_saved.get('Relacionamento', 5400000)), step=100000, key="meta_ov_rel")
             with ov5:
-                metas_orig['Compra de carteira'] = st.number_input("Carteira (R$)", min_value=0, value=3000000, step=100000, key="meta_ov_cart")
+                metas_orig['Compra de carteira'] = st.number_input("Carteira (R$)", min_value=0, value=int(_ov_saved.get('Compra de carteira', 3000000)), step=100000, key="meta_ov_cart")
 
             st.caption("Metas de novos contratos (quantidade)")
             oc1, oc2, oc3, oc4 = st.columns(4)
             with oc1:
-                metas_contr['B2C'] = st.number_input("B2C (qtd)", min_value=0, value=46, step=1, key="meta_oc_b2c")
+                metas_contr['B2C'] = st.number_input("B2C (qtd)", min_value=0, value=int(_oc_saved.get('B2C', 46)), step=1, key="meta_oc_b2c")
             with oc2:
-                metas_contr['Correspondente'] = st.number_input("Corresp. (qtd)", min_value=0, value=38, step=1, key="meta_oc_corresp")
+                metas_contr['Correspondente'] = st.number_input("Corresp. (qtd)", min_value=0, value=int(_oc_saved.get('Correspondente', 38)), step=1, key="meta_oc_corresp")
             with oc3:
-                metas_contr['Parceiro'] = st.number_input("Parceiro (qtd)", min_value=0, value=78, step=1, key="meta_oc_parc")
+                metas_contr['Parceiro'] = st.number_input("Parceiro (qtd)", min_value=0, value=int(_oc_saved.get('Parceiro', 78)), step=1, key="meta_oc_parc")
             with oc4:
-                metas_contr['Relacionamento'] = st.number_input("Relac. (qtd)", min_value=0, value=32, step=1, key="meta_oc_rel")
+                metas_contr['Relacionamento'] = st.number_input("Relac. (qtd)", min_value=0, value=int(_oc_saved.get('Relacionamento', 32)), step=1, key="meta_oc_rel")
+
+    # ── Botão Salvar Metas ──
+    if st.button("💾 Salvar metas no servidor", use_container_width=True):
+        todas_metas = {
+            'taxa': {k: round(v * 100, 2) for k, v in metas_taxa.items()},
+            'ticket': {k: int(v) for k, v in metas_ticket.items()},
+            'originacao': {k: int(v) for k, v in metas_orig.items()},
+            'contratos': {k: int(v) for k, v in metas_contr.items()},
+        }
+        ok = salvar_metas_github(todas_metas)
+        if ok:
+            st.success("✅ Metas salvas! Agora persistem entre sessões.")
+        else:
+            st.warning("⚠️ Não foi possível salvar (token GitHub não configurado?)")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
