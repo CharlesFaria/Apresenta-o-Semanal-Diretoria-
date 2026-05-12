@@ -1910,9 +1910,26 @@ def main():
     <div class="step-header">
         <div class="step-num">1</div>
         <span class="step-title">Carregar bases</span>
-        <span class="step-sub">Arraste ou clique para selecionar</span>
+        <span class="step-sub">Exporte do Salesforce e arraste aqui</span>
     </div>
     """, unsafe_allow_html=True)
+
+    # Links do Salesforce
+    with st.expander("🔗 Links dos relatórios no Salesforce"):
+        st.markdown("""
+        Clique no link, exporte como **.xlsx** e suba no campo correspondente abaixo.
+
+        | Base | Link |
+        |------|------|
+        | 📈 Oportunidades | [Abrir no Salesforce](https://barigui.lightning.force.com/lightning/r/Report/00OTT000007PrY92AK/view?queryScope=userFolders) |
+        | 👥 Leads | [Abrir no Salesforce](https://barigui.lightning.force.com/lightning/r/Report/00OTT0000060P6D2AU/view?queryScope=userFolders) |
+        | 💰 Taxas | [Abrir no Salesforce](https://barigui.lightning.force.com/lightning/r/Report/00OHY000000JqQi2AK/view) |
+        | 📋 Contratos | [Abrir no Salesforce](https://barigui.lightning.force.com/lightning/r/Report/00OHY000000JrVZ2A0/view) |
+        """)
+
+    # Verificar se tem apresentação modelo no repositório
+    MODELO_PATH = os.path.join(os.path.dirname(__file__), "apresentacao_modelo.pptx")
+    tem_modelo = os.path.exists(MODELO_PATH)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -1920,9 +1937,19 @@ def main():
         st.caption("Atualizar Entrada nas Fases.xlsx — use a base completa (período amplo)")
         f_opps = st.file_uploader("Base Oportunidades", type=["xlsx"], key="f_opps", label_visibility="collapsed")
     with col2:
-        st.markdown("**📑 Apresentação Modelo** `OBRIGATÓRIO`", help="Arquivo .pptx da diretoria")
-        st.caption("Arquivo .pptx atual da diretoria")
-        f_pptx = st.file_uploader("Apresentação", type=["pptx"], key="f_pptx", label_visibility="collapsed")
+        if tem_modelo:
+            st.markdown("**📑 Apresentação Modelo** ✅ pré-carregada")
+            st.caption("Usando apresentação do repositório. Suba outra se quiser substituir.")
+            f_pptx_upload = st.file_uploader("Apresentação", type=["pptx"], key="f_pptx", label_visibility="collapsed")
+            # Se o usuário subiu outra, usa ela; senão usa a do repositório
+            if f_pptx_upload:
+                f_pptx = f_pptx_upload
+            else:
+                f_pptx = MODELO_PATH  # será tratado como path no processar_tudo
+        else:
+            st.markdown("**📑 Apresentação Modelo** `OBRIGATÓRIO`", help="Arquivo .pptx da diretoria")
+            st.caption("Arquivo .pptx atual da diretoria")
+            f_pptx = st.file_uploader("Apresentação", type=["pptx"], key="f_pptx", label_visibility="collapsed")
 
     col3, col4 = st.columns(2)
     with col3:
@@ -2166,18 +2193,19 @@ def main():
 
     if can_generate:
         # Summary
+        pptx_nome = f_pptx.name if hasattr(f_pptx, 'name') else 'apresentacao_modelo.pptx'
         parts = [f"Oportunidades ({f_opps.name})"]
         if f_leads: parts.append("Leads")
         if f_taxas: parts.append("Taxas")
         if f_contratos: parts.append("Contratos")
         if f_plan: parts.append("Planejamento")
         st.markdown(f"""<div class="summary-box">
-            <strong style="color:#0A1628">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#2563EB">{f_pptx.name}</strong>
+            <strong style="color:#0A1628">Resumo:</strong> {' + '.join(parts)} → <strong style="color:#2563EB">{pptx_nome}</strong>
         </div>""", unsafe_allow_html=True)
 
     if not can_generate:
         st.markdown("""<div class="note-box">
-            ⏳ Carregue pelo menos a <strong>Base de Oportunidades</strong> e a <strong>Apresentação Modelo</strong> para continuar.
+            ⏳ Carregue pelo menos a <strong>Base de Oportunidades</strong> para continuar.
         </div>""", unsafe_allow_html=True)
         return
 
@@ -2186,11 +2214,18 @@ def main():
         status_text = st.empty()
 
         try:
+            # Ler pptx (pode ser upload ou path do repositório)
+            if isinstance(f_pptx, str):
+                with open(f_pptx, 'rb') as f:
+                    pptx_bytes = f.read()
+            else:
+                pptx_bytes = f_pptx.read()
+
             opps_bytes = f_opps.read()
             taxas_bytes_read = f_taxas.read() if f_taxas else None
             contratos_bytes_read = f_contratos.read() if f_contratos else None
             result_bytes, log_lines = processar_tudo(
-                pptx_bytes=f_pptx.read(),
+                pptx_bytes=pptx_bytes,
                 base_funil_bytes=opps_bytes,
                 base_dash_bytes=opps_bytes,
                 base_leads_bytes=f_leads.read() if f_leads else None,
