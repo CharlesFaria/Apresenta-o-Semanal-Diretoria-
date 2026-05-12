@@ -1195,13 +1195,41 @@ def gerar_ticket_png(resultados_ticket, metas_ticket, mes_nome):
         fmt_func=fmt_ticket,
     )
 
-METAS_ORIG_DEFAULT = {
-    'B2C': 10350000, 'Correspondente': 18200000, 'Parceiro': 18150000,
-    'Relacionamento': 5400000, 'Compra de carteira': 3000000,
+METAS_ORIG_MENSAL = {
+    #        B2C         Correspondente(PC)  Parceiro(GP)    Relacionamento  Carteira
+    1:  {'B2C': 8000000,  'Correspondente': 15400000, 'Parceiro': 17000000, 'Relacionamento': 5800000, 'Compra de carteira': 3000000},
+    2:  {'B2C': 9000000,  'Correspondente': 16500000, 'Parceiro': 17000000, 'Relacionamento': 6000000, 'Compra de carteira': 3000000},
+    3:  {'B2C': 10800000, 'Correspondente': 20000000, 'Parceiro': 19800000, 'Relacionamento': 7000000, 'Compra de carteira': 3000000},
+    4:  {'B2C': 9200000,  'Correspondente': 17300000, 'Parceiro': 20800000, 'Relacionamento': 4800000, 'Compra de carteira': 3000000},
+    5:  {'B2C': 9600000,  'Correspondente': 17900000, 'Parceiro': 21200000, 'Relacionamento': 4800000, 'Compra de carteira': 3000000},
+    6:  {'B2C': 10200000, 'Correspondente': 19000000, 'Parceiro': 22800000, 'Relacionamento': 5200000, 'Compra de carteira': 3000000},
+    7:  {'B2C': 11800000, 'Correspondente': 21600000, 'Parceiro': 25400000, 'Relacionamento': 6100000, 'Compra de carteira': 3000000},
+    8:  {'B2C': 11300000, 'Correspondente': 21300000, 'Parceiro': 24600000, 'Relacionamento': 5800000, 'Compra de carteira': 3000000},
+    9:  {'B2C': 11000000, 'Correspondente': 20500000, 'Parceiro': 24000000, 'Relacionamento': 5600000, 'Compra de carteira': 3000000},
+    10: {'B2C': 11700000, 'Correspondente': 21700000, 'Parceiro': 26300000, 'Relacionamento': 5900000, 'Compra de carteira': 3000000},
+    11: {'B2C': 11400000, 'Correspondente': 20800000, 'Parceiro': 25400000, 'Relacionamento': 5400000, 'Compra de carteira': 3000000},
+    12: {'B2C': 12400000, 'Correspondente': 22500000, 'Parceiro': 27500000, 'Relacionamento': 5800000, 'Compra de carteira': 3000000},
 }
-METAS_CONTR_DEFAULT = {
-    'B2C': 46, 'Correspondente': 38, 'Parceiro': 78, 'Relacionamento': 32,
+
+METAS_CONTR_MENSAL = {
+    #        B2C  Correspondente(PC)  Parceiro(GP)  Relacionamento
+    1:  {'B2C': 37, 'Correspondente': 33, 'Parceiro': 76, 'Relacionamento': 36},
+    2:  {'B2C': 44, 'Correspondente': 35, 'Parceiro': 76, 'Relacionamento': 33},
+    3:  {'B2C': 48, 'Correspondente': 42, 'Parceiro': 86, 'Relacionamento': 43},
+    4:  {'B2C': 40, 'Correspondente': 36, 'Parceiro': 89, 'Relacionamento': 29},
+    5:  {'B2C': 41, 'Correspondente': 37, 'Parceiro': 89, 'Relacionamento': 29},
+    6:  {'B2C': 43, 'Correspondente': 39, 'Parceiro': 94, 'Relacionamento': 31},
+    7:  {'B2C': 49, 'Correspondente': 44, 'Parceiro': 103, 'Relacionamento': 36},
+    8:  {'B2C': 46, 'Correspondente': 43, 'Parceiro': 98, 'Relacionamento': 34},
+    9:  {'B2C': 44, 'Correspondente': 41, 'Parceiro': 94, 'Relacionamento': 33},
+    10: {'B2C': 46, 'Correspondente': 43, 'Parceiro': 101, 'Relacionamento': 34},
+    11: {'B2C': 44, 'Correspondente': 41, 'Parceiro': 96, 'Relacionamento': 31},
+    12: {'B2C': 47, 'Correspondente': 44, 'Parceiro': 102, 'Relacionamento': 33},
 }
+
+# Defaults para fallback (usa abril)
+METAS_ORIG_DEFAULT = METAS_ORIG_MENSAL[4]
+METAS_CONTR_DEFAULT = METAS_CONTR_MENSAL[4]
 
 
 def processar_originacao(taxas_bytes, contratos_bytes):
@@ -2175,36 +2203,39 @@ def main():
             with tk5:
                 metas_ticket['Geral'] = st.number_input("Geral (R$)", min_value=0, value=int(_tk_saved.get('Geral', metas_ticket_default['Geral'])), step=1000, key="meta_tk_geral")
 
-    # ── Metas de Originação ──
+    # ── Metas de Originação (por mês) ──
     _ov_saved = metas_salvas.get('originacao', {})
     _oc_saved = metas_salvas.get('contratos', {})
-    metas_orig = dict(METAS_ORIG_DEFAULT)
-    metas_contr = dict(METAS_CONTR_DEFAULT)
+    metas_orig_default = METAS_ORIG_MENSAL.get(mes_ref, METAS_ORIG_DEFAULT)
+    metas_contr_default = METAS_CONTR_MENSAL.get(mes_ref, METAS_CONTR_DEFAULT)
+    metas_orig = dict(metas_orig_default)
+    metas_contr = dict(metas_contr_default)
     if f_contratos and f_taxas:
         with st.expander("📊 Metas de Originação + Novos Contratos"):
+            st.caption(f"Metas para {MESES_PT[mes_ref]} (carregadas automaticamente)")
             st.caption("Metas de valor originado (R$)")
             ov1, ov2, ov3, ov4, ov5 = st.columns(5)
             with ov1:
-                metas_orig['B2C'] = st.number_input("B2C (R$)", min_value=0, value=int(_ov_saved.get('B2C', 10350000)), step=100000, key="meta_ov_b2c")
+                metas_orig['B2C'] = st.number_input("B2C (R$)", min_value=0, value=int(_ov_saved.get('B2C', metas_orig_default['B2C'])), step=100000, key="meta_ov_b2c")
             with ov2:
-                metas_orig['Correspondente'] = st.number_input("Corresp. (R$)", min_value=0, value=int(_ov_saved.get('Correspondente', 18200000)), step=100000, key="meta_ov_corresp")
+                metas_orig['Correspondente'] = st.number_input("PC (R$)", min_value=0, value=int(_ov_saved.get('Correspondente', metas_orig_default['Correspondente'])), step=100000, key="meta_ov_corresp")
             with ov3:
-                metas_orig['Parceiro'] = st.number_input("Parceiro (R$)", min_value=0, value=int(_ov_saved.get('Parceiro', 18150000)), step=100000, key="meta_ov_parc")
+                metas_orig['Parceiro'] = st.number_input("GP (R$)", min_value=0, value=int(_ov_saved.get('Parceiro', metas_orig_default['Parceiro'])), step=100000, key="meta_ov_parc")
             with ov4:
-                metas_orig['Relacionamento'] = st.number_input("Relac. (R$)", min_value=0, value=int(_ov_saved.get('Relacionamento', 5400000)), step=100000, key="meta_ov_rel")
+                metas_orig['Relacionamento'] = st.number_input("Rel (R$)", min_value=0, value=int(_ov_saved.get('Relacionamento', metas_orig_default['Relacionamento'])), step=100000, key="meta_ov_rel")
             with ov5:
-                metas_orig['Compra de carteira'] = st.number_input("Carteira (R$)", min_value=0, value=int(_ov_saved.get('Compra de carteira', 3000000)), step=100000, key="meta_ov_cart")
+                metas_orig['Compra de carteira'] = st.number_input("Carteira (R$)", min_value=0, value=int(_ov_saved.get('Compra de carteira', metas_orig_default.get('Compra de carteira', 3000000))), step=100000, key="meta_ov_cart")
 
             st.caption("Metas de novos contratos (quantidade)")
             oc1, oc2, oc3, oc4 = st.columns(4)
             with oc1:
-                metas_contr['B2C'] = st.number_input("B2C (qtd)", min_value=0, value=int(_oc_saved.get('B2C', 46)), step=1, key="meta_oc_b2c")
+                metas_contr['B2C'] = st.number_input("B2C (qtd)", min_value=0, value=int(_oc_saved.get('B2C', metas_contr_default['B2C'])), step=1, key="meta_oc_b2c")
             with oc2:
-                metas_contr['Correspondente'] = st.number_input("Corresp. (qtd)", min_value=0, value=int(_oc_saved.get('Correspondente', 38)), step=1, key="meta_oc_corresp")
+                metas_contr['Correspondente'] = st.number_input("PC (qtd)", min_value=0, value=int(_oc_saved.get('Correspondente', metas_contr_default['Correspondente'])), step=1, key="meta_oc_corresp")
             with oc3:
-                metas_contr['Parceiro'] = st.number_input("Parceiro (qtd)", min_value=0, value=int(_oc_saved.get('Parceiro', 78)), step=1, key="meta_oc_parc")
+                metas_contr['Parceiro'] = st.number_input("GP (qtd)", min_value=0, value=int(_oc_saved.get('Parceiro', metas_contr_default['Parceiro'])), step=1, key="meta_oc_parc")
             with oc4:
-                metas_contr['Relacionamento'] = st.number_input("Relac. (qtd)", min_value=0, value=int(_oc_saved.get('Relacionamento', 32)), step=1, key="meta_oc_rel")
+                metas_contr['Relacionamento'] = st.number_input("Rel (qtd)", min_value=0, value=int(_oc_saved.get('Relacionamento', metas_contr_default['Relacionamento'])), step=1, key="meta_oc_rel")
 
     # ── Botão Salvar Metas ──
     if st.button("💾 Salvar metas no servidor", use_container_width=True):
