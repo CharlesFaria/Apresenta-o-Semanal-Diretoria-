@@ -1684,7 +1684,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
     snapshot_mes_ant = None
     snapshot_data_real = None
     advance(1, "🔍 Buscando snapshot do mês anterior...")
-    snap_date, snap_data = buscar_snapshot_mais_proximo(data_mes_ant, tolerancia_dias=7)
+    snap_date, snap_data = buscar_snapshot_mais_proximo(data_mes_ant)
     if snap_data:
         snapshot_mes_ant = snap_data
         snapshot_data_real = snap_date
