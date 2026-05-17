@@ -1524,16 +1524,15 @@ def carregar_snapshot_github(data_ref):
         return None
 
 
-def buscar_snapshot_mais_proximo(data_alvo, tolerancia_dias=7):
+def buscar_snapshot_mais_proximo(data_alvo, tolerancia_dias=3):
     """
-    Busca o snapshot com data mais próxima da data_alvo.
+    Busca o snapshot mais próximo da data_alvo (±3 dias = mesma semana).
     Retorna (data_snapshot, dados) ou (None, None) se não encontrar.
     """
     datas = listar_snapshots_github()
     if not datas:
         return None, None
 
-    # Encontrar o mais próximo
     melhor = None
     menor_diff = timedelta(days=999)
     for d in datas:
