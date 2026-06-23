@@ -791,7 +791,6 @@ def fmt_num(v):
     if v >= 1000: return f"{int(v):,}".replace(',', '.')
     return str(int(v))
 
-
 def gerar_dashboard_png(canal, metricas_plan, metricas_mes, metricas_sem, metricas_real,
                          ref=None, re_start=None, re_end=None, mp_start=None, mp_end=None, sw_start=None, sw_end=None,
                          pct_mtd_override=None):
@@ -1232,8 +1231,15 @@ METAS_ORIG_DEFAULT = METAS_ORIG_MENSAL[4]
 METAS_CONTR_DEFAULT = METAS_CONTR_MENSAL[4]
 
 
-def processar_originacao(taxas_bytes, contratos_bytes):
-    """Calcula valor originado (COM derivadas) e novos contratos por canal."""
+def processar_originacao(taxas_bytes, contratos_bytes, valor_carteira_manual=0):
+    """Calcula valor originado (COM derivadas) e novos contratos por canal.
+
+    valor_carteira_manual: valor de Compra de carteira digitado no site.
+    Como esse canal NÃO vem da base do Salesforce, o valor é informado
+    manualmente toda semana. Quando > 0, é usado na linha Compra de carteira;
+    quando 0, a linha aparece zerada (vira '-' no slide).
+    Compra de carteira não conta como novo contrato → contratos sempre 0.
+    """
     df_taxa = pd.read_excel(io.BytesIO(taxas_bytes))
     df_contr = pd.read_excel(io.BytesIO(contratos_bytes))
 
@@ -1247,10 +1253,11 @@ def processar_originacao(taxas_bytes, contratos_bytes):
             'contratos': contr_por_canal.get(canal, 0),
         }
 
-    # Compra de carteira (se existir)
-    val_carteira = vol_por_canal.get('Compra de carteira', 0)
-    contr_carteira = contr_por_canal.get('Compra de carteira', 0)
-    resultados['Compra de carteira'] = {'valor': val_carteira, 'contratos': contr_carteira}
+    # Compra de carteira: valor manual do site tem prioridade.
+    # Se não informado (0), tenta a base (que normalmente não tem o canal → 0).
+    val_carteira = valor_carteira_manual if valor_carteira_manual and valor_carteira_manual > 0 \
+        else vol_por_canal.get('Compra de carteira', 0)
+    resultados['Compra de carteira'] = {'valor': val_carteira, 'contratos': 0}
 
     return resultados
 
@@ -1637,8 +1644,13 @@ def salvar_metas_github(metas_data):
 def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_bytes,
                    plan_bytes, data_atual, data_sem_pass, data_mes_ant, progress_bar, status_text,
                    dist_mtd_user=None, semana_atual=3, taxas_bytes=None, metas_taxa=None,
-                   contratos_bytes=None, metas_ticket=None, metas_orig=None, metas_contr=None):
-    """Processa tudo e retorna (bytes_pptx, lista_de_logs)."""
+                   contratos_bytes=None, metas_ticket=None, metas_orig=None, metas_contr=None,
+                   valor_carteira=0):
+    """Processa tudo e retorna (bytes_pptx, lista_de_logs).
+
+    valor_carteira: valor de Compra de carteira digitado manualmente no site
+    (nasce 0 a cada execução; não persiste e não vem da base do Salesforce).
+    """
     # Atualiza DIST_MTD com valores do usuário
     if dist_mtd_user:
         for m in range(1, 13):
@@ -1794,7 +1806,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
         advance(2, "📊 Gerando slide de originação...")
         log("\n📊 Gerando slide de Originação + Novos Contratos...")
         try:
-            resultados_orig = processar_originacao(taxas_bytes, contratos_bytes)
+            resultados_orig = processar_originacao(taxas_bytes, contratos_bytes, valor_carteira_manual=valor_carteira)
             _metas_o = metas_orig or METAS_ORIG_DEFAULT
             _metas_c = metas_contr or METAS_CONTR_DEFAULT
             png_orig = gerar_originacao_png(resultados_orig, _metas_o, _metas_c)
@@ -1808,6 +1820,9 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
             else:
                 log(f"  ⚠️ Slide 5 não existe")
 
+            cart = resultados_orig.get('Compra de carteira', {})
+            if cart.get('valor', 0) > 0:
+                log(f"     {'Compra de carteira':20s} | Valor: R${cart.get('valor',0):,.0f} (manual)")
             for canal in TAXA_CANAIS_ORDEM:
                 res = resultados_orig.get(canal, {})
                 log(f"     {canal:20s} | Valor: R${res.get('valor',0):,.0f} | Contratos: {res.get('contratos',0)}")
@@ -1900,7 +1915,7 @@ def processar_tudo(pptx_bytes, base_funil_bytes, base_dash_bytes, base_leads_byt
         except: pass
         try:
             if taxas_bytes and contratos_bytes:
-                snap_orig = processar_originacao(taxas_bytes, contratos_bytes)
+                snap_orig = processar_originacao(taxas_bytes, contratos_bytes, valor_carteira_manual=valor_carteira)
                 snap_orig = {k: {kk: float(vv) for kk, vv in v.items()} for k, v in snap_orig.items()}
         except: pass
 
@@ -2209,6 +2224,8 @@ def main():
     metas_contr_default = METAS_CONTR_MENSAL.get(mes_ref, METAS_CONTR_DEFAULT)
     metas_orig = dict(metas_orig_default)
     metas_contr = dict(metas_contr_default)
+    valor_carteira = 0  # default; sobrescrito pelo campo abaixo se o expander existir.
+                        # Nasce 0 a cada execução: não persiste nem herda do mês anterior.
     if f_contratos and f_taxas:
         with st.expander("📊 Metas de Originação + Novos Contratos"):
             st.caption(f"Metas para {MESES_PT[mes_ref]} (carregadas automaticamente)")
@@ -2235,6 +2252,23 @@ def main():
                 metas_contr['Parceiro'] = st.number_input("GP (qtd)", min_value=0, value=int(_oc_saved.get('Parceiro', metas_contr_default['Parceiro'])), step=1, key="meta_oc_parc")
             with oc4:
                 metas_contr['Relacionamento'] = st.number_input("Rel (qtd)", min_value=0, value=int(_oc_saved.get('Relacionamento', metas_contr_default['Relacionamento'])), step=1, key="meta_oc_rel")
+
+            # ── Valor REALIZADO de Compra de carteira (manual, não é meta) ──
+            # Como esse canal não vem do Salesforce, o valor é digitado aqui toda
+            # semana. value=0 fixo: nasce zerado a cada execução, NÃO persiste e
+            # NÃO herda do mês anterior. Nos meses sem compra de carteira, deixe 0
+            # e a linha aparece como "-" no slide.
+            st.markdown("---")
+            st.caption("💼 Valor realizado de Compra de carteira (R$) — preencha só nos meses que tiveram")
+            valor_carteira = st.number_input(
+                "Compra de carteira — realizado (R$)",
+                min_value=0,
+                value=0,
+                step=100000,
+                key="valor_carteira_realizado",
+                help="Compra de carteira não vem do Salesforce: digite o valor aqui. "
+                     "Deixe 0 nos meses sem compra de carteira (a linha vira '-' no slide)."
+            )
 
     # ── Botão Salvar Metas ──
     if st.button("💾 Salvar metas no servidor", use_container_width=True):
@@ -2342,6 +2376,7 @@ def main():
                 metas_ticket=metas_ticket,
                 metas_orig=metas_orig,
                 metas_contr=metas_contr,
+                valor_carteira=valor_carteira,
             )
 
             # Success
