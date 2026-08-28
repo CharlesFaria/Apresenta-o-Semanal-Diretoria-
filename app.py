@@ -1614,10 +1614,10 @@ def carregar_metas_github():
 
 
 def salvar_metas_github(metas_data):
-    """Salva metas no GitHub como JSON."""
+    """Salva metas no GitHub como JSON. Retorna (ok: bool, mensagem: str)."""
     headers = _github_headers()
     if not headers:
-        return False
+        return False, "Token GitHub não configurado"
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{METAS_FILE}"
     content_b64 = base64.b64encode(json.dumps(metas_data, ensure_ascii=False).encode()).decode()
     try:
@@ -1625,16 +1625,19 @@ def salvar_metas_github(metas_data):
         if resp.status_code == 200:
             sha = resp.json().get("sha")
             body = {"message": "Atualizar metas", "content": content_b64, "sha": sha}
-        else:
+        elif resp.status_code == 404:
             body = {"message": "Criar metas", "content": content_b64}
+        else:
+            return False, f"Erro ao verificar arquivo: {resp.status_code} - {resp.text[:200]}"
+
         resp = requests.put(url, headers=headers, json=body, timeout=15)
         if resp.status_code in (200, 201):
-            # Limpar cache para carregar os novos valores
             carregar_metas_github.clear()
-            return True
-    except Exception:
-        pass
-    return False
+            return True, "Metas salvas com sucesso"
+        else:
+            return False, f"Erro ao salvar: {resp.status_code} - {resp.text[:200]}"
+    except Exception as e:
+        return False, f"Erro de conexão: {str(e)}"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2271,18 +2274,18 @@ def main():
             )
 
     # ── Botão Salvar Metas ──
-    if st.button("💾 Salvar metas no servidor", use_container_width=True):
+      if st.button("💾 Salvar metas no servidor", use_container_width=True):
         todas_metas = {
             'taxa': {k: round(v * 100, 2) for k, v in metas_taxa.items()},
             'ticket': {k: int(v) for k, v in metas_ticket.items()},
             'originacao': {k: int(v) for k, v in metas_orig.items()},
             'contratos': {k: int(v) for k, v in metas_contr.items()},
         }
-        ok = salvar_metas_github(todas_metas)
+        ok, msg = salvar_metas_github(todas_metas)
         if ok:
             st.success("✅ Metas salvas! Agora persistem entre sessões.")
         else:
-            st.warning("⚠️ Não foi possível salvar (token GitHub não configurado?)")
+            st.warning(f"⚠️ Não foi possível salvar: {msg}")
 
     st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
